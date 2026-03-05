@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart School - Modern Education Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/landing/styles/landing.css">
+</head>
+
+<body>
+
+
+    <header class="header" id="header">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <span class="logo-text">Smart<span class="logo-accent">School</span></span>
+            </a>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#hero" class="nav-link active">Home</a></li>
+                <li><a href="#features" class="nav-link">Features</a></li>
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="#testimonials" class="nav-link">Testimonials</a></li>
+                <li><a href="#contact" class="nav-link">Contact</a></li>
+            </ul>
+            <div class="nav-buttons">
+                <a href="/login" class="btn btn-secondary">Sign In</a>
+                <a href="/student-admission" class="btn btn-primary">Apply Now</a>
+                <div class="hamburger" id="hamburger">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero" id="hero">
+        <div class="hero-background">
+            <div class="hero-shape shape-1"></div>
+            <div class="hero-shape shape-2"></div>
+            <div class="hero-shape shape-3"></div>
+            <div class="hero-grid"></div>
+        </div>
+        <div class="hero-content">
+            <div class="hero-text">
+                <div class="hero-badge reveal reveal-up delay-100">
+                    <span class="badge-dot"></span>
+                    <span>Transforming Education Digitally</span>
+                </div>
+                <h1 class="hero-title reveal reveal-up delay-200">
+                    Empowering <span class="gradient-text">Future Generations</span> With Smart Learning
+                </h1>
+                <p class="hero-description reveal reveal-up delay-300">
+                    Experience the next generation of online education with our comprehensive school management system.
+                    Live classes, attendance tracking, academics, and career opportunities — all in one platform.
+                </p>
+                <div class="hero-buttons reveal reveal-up delay-400">
+                    <a href="/student-admission" class="btn btn-primary btn-lg">
+                        <i class="fas fa-user-plus"></i>
+                        Apply Now
+                    </a>
+                    <a href="/job-application" class="btn btn-primary btn-lg">
+                        <i class="fas fa-briefcase"></i>
+                        Apply for Job
+                    </a>
+                </div>
+                <div class="hero-stats reveal reveal-up delay-500">
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="15000">0</span>
+                        <span class="stat-label">Students</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="500">0</span>
+                        <span class="stat-label">Teachers</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="1200">0</span>
+                        <span class="stat-label">Live Classes</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual reveal reveal-right delay-600">
+                <div class="hero-card">
+                    <div class="card-header">
+                        <div class="card-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="dashboard-preview">
+                            <div class="preview-header">
+                                <div class="preview-avatar"></div>
+                                <div class="preview-info">
+                                    <div class="preview-name"></div>
+                                    <div class="preview-role"></div>
+                                </div>
+                            </div>
+                            <div class="preview-stats">
+                                <div class="preview-stat"></div>
+                                <div class="preview-stat"></div>
+                                <div class="preview-stat"></div>
+                            </div>
+                            <div class="preview-chart">
+                                <div class="chart-bar" style="height: 40%"></div>
+                                <div class="chart-bar" style="height: 60%"></div>
+                                <div class="chart-bar" style="height: 80%"></div>
+                                <div class="chart-bar" style="height: 55%"></div>
+                                <div class="chart-bar" style="height: 70%"></div>
+                                <div class="chart-bar" style="height: 90%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="floating-card card-1">
+                    <i class="fas fa-video"></i>
+                    <span>Live Class</span>
+                </div>
+                <div class="floating-card card-2">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analytics</span>
+                </div>
+                <div class="floating-card card-3">
+                    <i class="fas fa-users"></i>
+                    <span>500+ Online</span>
+                </div>
+            </div>
+        </div>
+        <div class="hero-scroll">
+            <a href="#features">
+                <span>Scroll Down</span>
+                <i class="fas fa-chevron-down"></i>
+            </a>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header reveal reveal-up">
+                <span class="section-badge">Features</span>
+                <h2 class="section-title">Complete School Management</h2>
+                <p class="section-subtitle">Everything you need to manage your educational institution efficiently</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <h3>Academic System</h3>
+                    <p>Comprehensive curriculum management with online resources and progress tracking.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
+                    <h3>Student Dashboard</h3>
+                    <p>Personalized dashboard for students to track assignments, grades, and attendance.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                    </div>
+                    <h3>Teacher Dashboard</h3>
+                    <p>Tools for managing classes, grading, and communicating with students and parents.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-house-user"></i>
+                    </div>
+                    <h3>Parent Portal</h3>
+                    <p>Real-time updates on student progress, attendance, and communication with teachers.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <h3>Homework Management</h3>
+                    <p>Assign, submit, and grade homework online with automatic reminders.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <h3>Exams & Results</h3>
+                    <p>Online examinations with automated grading and detailed result analysis.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <h3>Live Online Classes</h3>
+                    <p>HD video streaming with interactive tools for engaging online learning.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h3>Notifications</h3>
+                    <p>Instant alerts via email, SMS, and push notifications for important updates.</p>
+                    <div class="feature-hover">
+                        <span>Learn More</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="live-learning" id="liveLearning">
+        <div class="container">
+            <div class="section-header reveal reveal-up">
+                <span class="section-badge">Live Learning</span>
+                <h2 class="section-title">Real-Time Online Education</h2>
+                <p class="section-subtitle">Engage with teachers and peers in immersive virtual classrooms</p>
+            </div>
+            <div class="live-learning-content">
+                <div class="live-screen">
+                    <div class="screen-header">
+                        <div class="screen-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <span class="screen-title">Smart School Live Class</span>
+                        <div class="screen-status">
+                            <span class="status-dot"></span>
+                            LIVE
+                        </div>
+                    </div>
+                    <div class="screen-content">
+                        <div class="video-area">
+                            <div class="video-placeholder">
+                                <i class="fas fa-play-circle"></i>
+                                <span>Click to Join</span>
+                            </div>
+                            <div class="video-grid">
+                                <div class="video-mini">T</div>
+                                <div class="video-mini">S1</div>
+                                <div class="video-mini">S2</div>
+                                <div class="video-mini">+47</div>
+                            </div>
+                        </div>
+                        <div class="whiteboard-area">
+                            <i class="fas fa-chalkboard"></i>
+                        </div>
+                        <div class="chat-area">
+                            <div class="chat-messages">
+                                <div class="chat-msg">Hello everyone!</div>
+                                <div class="chat-msg">Good morning!</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="screen-controls">
+                        <button class="ctrl-btn"><i class="fas fa-microphone"></i></button>
+                        <button class="ctrl-btn"><i class="fas fa-video"></i></button>
+                        <button class="ctrl-btn"><i class="fas fa-desktop"></i></button>
+                        <button class="ctrl-btn"><i class="fas fa-hand-paper"></i></button>
+                        <button class="ctrl-btn ctrl-end"><i class="fas fa-phone-slash"></i></button>
+                    </div>
+                </div>
+                <div class="live-features">
+                    <div class="live-feature">
+                        <div class="live-icon">
+                            <i class="fas fa-video"></i>
+                            <span class="live-indicator"></span>
+                        </div>
+                        <div class="live-text">
+                            <h4>Live Video Sessions</h4>
+                            <p>High-definition video streaming with adaptive quality.</p>
+                        </div>
+                    </div>
+                    <div class="live-feature">
+                        <div class="live-icon">
+                            <i class="fas fa-fingerprint"></i>
+                            <span class="live-indicator"></span>
+                        </div>
+                        <div class="live-text">
+                            <h4>Real-time Attendance</h4>
+                            <p>Automatic attendance tracking with verification.</p>
+                        </div>
+                    </div>
+                    <div class="live-feature">
+                        <div class="live-icon">
+                            <i class="fas fa-pen-fancy"></i>
+                            <span class="live-indicator"></span>
+                        </div>
+                        <div class="live-text">
+                            <h4>Interactive Whiteboard</h4>
+                            <p>Collaborative digital whiteboard with annotations.</p>
+                        </div>
+                    </div>
+                    <div class="live-feature">
+                        <div class="live-icon">
+                            <i class="fas fa-history"></i>
+                            <span class="live-indicator"></span>
+                        </div>
+                        <div class="live-text">
+                            <h4>Recorded Replay</h4>
+                            <p>Access full session recordings anytime.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="about" id="about">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-visual">
+                    <div class="about-image">
+                        <div class="about-pattern"></div>
+                    </div>
+                    <div class="about-stats-card">
+                        <div class="about-stat">
+                            <span class="about-stat-number" data-count="15000">0</span>
+                            <span class="about-stat-label">Students</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="about-stat-number" data-count="500">0</span>
+                            <span class="about-stat-label">Teachers</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="about-stat-number" data-count="1200">0</span>
+                            <span class="about-stat-label">Live Classes</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="about-stat-number" data-count="98">0</span>
+                            <span class="about-stat-label">% Success</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="about-text">
+                    <div class="section-header reveal reveal-up">
+                        <span class="section-badge">About Us</span>
+                        <h2 class="section-title">Revolutionizing Education Through Technology</h2>
+                    </div>
+                    <p class="about-description">
+                        Smart School is a comprehensive online education management system designed to transform how
+                        educational institutions operate. We combine cutting-edge technology with educational expertise
+                        to create seamless learning experiences.
+                    </p>
+                    <div class="about-features">
+                        <div class="about-feature">
+                            <i class="fas fa-eye"></i>
+                            <div>
+                                <h4>Digital Vision</h4>
+                                <p>Bridging the gap between traditional education and modern technology.</p>
+                            </div>
+                        </div>
+                        <div class="about-feature">
+                            <i class="fas fa-robot"></i>
+                            <div>
+                                <h4>Smart Automation</h4>
+                                <p>Automating administrative tasks to focus more on education.</p>
+                            </div>
+                        </div>
+                        <div class="about-feature">
+                            <i class="fas fa-globe"></i>
+                            <div>
+                                <h4>Modern Ecosystem</h4>
+                                <p>Connected platform for students, teachers, and parents.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="opportunities" id="opportunities">
+        <div class="container">
+            <div class="section-header reveal reveal-up">
+                <span class="section-badge">Join Us</span>
+                <h2 class="section-title">Student Admission & Careers</h2>
+                <p class="section-subtitle">Take the first step towards a brighter future</p>
+            </div>
+            <div class="opportunities-grid">
+                <div class="opportunity-card admission-card">
+                    <div class="opportunity-icon">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
+                    <h3>Student Admission</h3>
+                    <p>Join thousands of students learning with our cutting-edge platform.</p>
+                    <ul class="opportunity-list">
+                        <li><i class="fas fa-check"></i> Expert Faculty</li>
+                        <li><i class="fas fa-check"></i> Modern Curriculum</li>
+                        <li><i class="fas fa-check"></i> Online Learning</li>
+                        <li><i class="fas fa-check"></i> Career Guidance</li>
+                    </ul>
+                    <a href="/student-admission" class="btn btn-primary btn-lg">
+                        <i class="fas fa-user-plus"></i>
+                        Apply Now
+                    </a>
+                </div>
+                <div class="opportunity-card career-card">
+                    <div class="opportunity-icon">
+                        <i class="fas fa-briefcase"></i>
+                    </div>
+                    <h3>Career Opportunities</h3>
+                    <p>Join our team of dedicated educators and professionals.</p>
+                    <ul class="opportunity-list">
+                        <li><i class="fas fa-check"></i> Competitive Salary</li>
+                        <li><i class="fas fa-check"></i> Professional Growth</li>
+                        <li><i class="fas fa-check"></i> Flexible Working</li>
+                        <li><i class="fas fa-check"></i> Training Programs</li>
+                    </ul>
+                    <a href="/job-application" class="btn btn-primary btn-lg">
+                        <i class="fas fa-briefcase"></i>
+                        Apply for Job
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="benefits" id="benefits">
+        <div class="container">
+            <div class="section-header reveal reveal-up">
+                <span class="section-badge">Benefits</span>
+                <h2 class="section-title">Why Choose Smart School?</h2>
+                <p class="section-subtitle">Experience the advantages of modern digital education</p>
+            </div>
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-leaf"></i>
+                    </div>
+                    <h4>Paperless School</h4>
+                    <p>Go green with our digital-first approach to education management.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-globe"></i>
+                    </div>
+                    <h4>Learn Anywhere</h4>
+                    <p>Access courses and materials from any location, any time.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h4>Automated Attendance</h4>
+                    <p>Smart tracking with GPS and face recognition technology.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-handshake"></i>
+                    </div>
+                    <h4>Parent Engagement</h4>
+                    <p>Keep parents informed and involved in their child's education.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h4>Secure Platform</h4>
+                    <p>Enterprise-grade security protecting your data always.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4>Mobile Friendly</h4>
+                    <p>Full-featured mobile app for learning on the go.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h4>Real-time Monitoring</h4>
+                    <p>Track progress and performance with live analytics.</p>
+                </div>
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h4>Smart Notifications</h4>
+                    <p>Instant updates on important events and deadlines.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="testimonials" id="testimonials">
+        <div class="container">
+            <div class="section-header reveal reveal-up">
+                <span class="section-badge">Testimonials</span>
+                <h2 class="section-title">What People Say</h2>
+                <p class="section-subtitle">Hear from our satisfied students, parents, and teachers</p>
+            </div>
+            <div class="testimonials-slider">
+                <div class="testimonials-track" id="testimonialsTrack">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <div class="testimonial-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="testimonial-info">
+                                <h4>Sarah Johnson</h4>
+                                <span>Parent</span>
+                            </div>
+                            <div class="testimonial-rating">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                        <p class="testimonial-text">"Smart School has transformed how my children learn. I can track
+                            their progress in real-time and communicate directly with teachers."</p>
+                    </div>
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <div class="testimonial-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="testimonial-info">
+                                <h4>Michael Chen</h4>
+                                <span>Student</span>
+                            </div>
+                            <div class="testimonial-rating">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                        <p class="testimonial-text">"The live classes are amazing! I can rewatch recordings whenever I
+                            need to revise. The interactive whiteboard makes learning so much more engaging."</p>
+                    </div>
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <div class="testimonial-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="testimonial-info">
+                                <h4>Emily Williams</h4>
+                                <span>Teacher</span>
+                            </div>
+                            <div class="testimonial-rating">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                        <p class="testimonial-text">"This platform has made my job so much easier. From managing
+                            attendance to grading assignments, everything is streamlined."</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonials-controls">
+                <button class="testimonial-btn" id="prevBtn">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="testimonial-dots" id="testimonialDots"></div>
+                <button class="testimonial-btn" id="nextBtn">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="contact" id="contact">
+        <div class="container">
+            <div class="section-header reveal reveal-up">
+                <span class="section-badge">Contact</span>
+                <h2 class="section-title">Get In Touch</h2>
+                <p class="section-subtitle">We're here to answer any questions you may have</p>
+            </div>
+            <div class="contact-content">
+                <div class="contact-form-wrapper">
+                    <form class="contact-form" id="contactForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Your Name</label>
+                                <input type="text" placeholder="John Doe" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="email" placeholder="john@example.com" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Subject</label>
+                            <input type="text" placeholder="How can we help?" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Message</label>
+                            <textarea rows="5" placeholder="Write your message here..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg btn-block">
+                            <i class="fas fa-paper-plane"></i>
+                            Send Message
+                        </button>
+                    </form>
+                    <div class="form-success" id="formSuccess">
+                        <i class="fas fa-check-circle"></i>
+                        <h4>Message Sent!</h4>
+                        <p>We'll get back to you soon.</p>
+                    </div>
+                </div>
+                <div class="contact-info">
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h4>School Address</h4>
+                            <p>123 Education Lane, Learning City, LC 12345</p>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h4>Email Us</h4>
+                            <p>admin@gmail.com</p>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h4>Call Us</h4>
+                            <p>+1 (555) 123-4567<br>+1 (555) 987-6543</p>
+                        </div>
+                    </div>
+                    <div class="contact-social">
+                        <a href="#" class="social-link"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-linkedin-in"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="footer-logo">
+                        <div class="logo-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <span>Smart<span class="logo-accent">School</span></span>
+                    </div>
+                    <p>Transforming education through innovative technology. Join thousands of students and educators
+                        building the future of learning.</p>
+                    <div class="footer-social">
+                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="#"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="#hero">Home</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#about">About Us</a></li>
+                        <li><a href="#testimonials">Testimonials</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>Modules</h4>
+                    <ul>
+                        <li><a href="#">Student Portal</a></li>
+                        <li><a href="#">Teacher Portal</a></li>
+                        <li><a href="#">Parent Portal</a></li>
+                        <li><a href="#">Admin Panel</a></li>
+                        <li><a href="#">Live Classes</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>Admissions</h4>
+                    <ul>
+                        <li><a href="/student-admission">Apply Now</a></li>
+                        <li><a href="/student-admission">Admission Form</a></li>
+                        <li><a href="#">Fee Structure</a></li>
+                        <li><a href="#">Scholarships</a></li>
+                        <li><a href="#">FAQs</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Smart School. All rights reserved.</p>
+                <div class="footer-legal">
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/landing/js/landing.js"></script>
+</body>
+
+</html>

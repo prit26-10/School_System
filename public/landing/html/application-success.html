@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Submitted - Smart School</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/landing/styles/landing.css">
+    <link rel="stylesheet" href="/landing/styles/form.css">
+    <link rel="stylesheet" href="../styles/common.css">
+    <link rel="stylesheet" href="../styles/application-success.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="header" id="header">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <span class="logo-text">Smart<span class="logo-accent">School</span></span>
+                </a>
+                <ul class="nav-menu" id="navMenu">
+                    <li><a href="/" class="nav-link">Home</a></li>
+                    <li><a href="/#features" class="nav-link">Features</a></li>
+                    <li><a href="/#about" class="nav-link">About</a></li>
+                    <li><a href="/#testimonials" class="nav-link">Testimonials</a></li>
+                    <li><a href="/#contact" class="nav-link">Contact</a></li>
+                </ul>
+                <div class="nav-buttons">
+                    <a href="/login" class="btn btn-secondary">Sign In</a>
+                    <a href="/student-admission" class="btn btn-primary">Apply Now</a>
+                    <div class="hamburger" id="hamburger">
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="success-card">
+                <div class="success-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h1>Application Submitted!</h1>
+                <p>Thank you for applying to Smart School. We have received your application and will review it shortly.</p>
+                <div class="application-id">Application ID: <span id="applicationId">SS-2024-0001</span></div>
+                <p class="success-note">You will receive a confirmation email with further instructions.</p>
+                <a href="/" class="btn btn-primary">
+                    <i class="fas fa-home"></i>
+                    Back to Home
+                </a>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-content">
+                    <div class="footer-brand">
+                        <div class="footer-logo">
+                            <div class="logo-icon">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <span>Smart<span class="logo-accent">School</span></span>
+                        </div>
+                        <p>Transforming education through innovative technology. Join thousands of students and educators building the future of learning.</p>
+                        <div class="footer-social">
+                            <a href="#"><i class="fab fa-facebook-f"></i></a>
+                            <a href="#"><i class="fab fa-twitter"></i></a>
+                            <a href="#"><i class="fab fa-instagram"></i></a>
+                            <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                            <a href="#"><i class="fab fa-youtube"></i></a>
+                        </div>
+                    </div>
+                    <div class="footer-links">
+                        <h4>Quick Links</h4>
+                        <ul>
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/#features">Features</a></li>
+                            <li><a href="/#about">About Us</a></li>
+                            <li><a href="/#testimonials">Testimonials</a></li>
+                            <li><a href="/#contact">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links">
+                        <h4>Modules</h4>
+                        <ul>
+                            <li><a href="#">Student Portal</a></li>
+                            <li><a href="#">Teacher Portal</a></li>
+                            <li><a href="#">Parent Portal</a></li>
+                            <li><a href="#">Admin Panel</a></li>
+                            <li><a href="#">Live Classes</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links">
+                        <h4>Admissions</h4>
+                        <ul>
+                            <li><a href="/student-admission">Apply Now</a></li>
+                            <li><a href="/student-admission">Admission Form</a></li>
+                            <li><a href="#">Fee Structure</a></li>
+                            <li><a href="#">Scholarships</a></li>
+                            <li><a href="#">FAQs</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>&copy; 2024 Smart School. All rights reserved.</p>
+                    <div class="footer-legal">
+                        <a href="#">Privacy Policy</a>
+                        <a href="#">Terms of Service</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const header = document.getElementById('header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 20) {
+                header.classList.add('header-scrolled');
+            } else {
+                header.classList.remove('header-scrolled');
+            }
+        });
+
+        const hamburger = document.getElementById('hamburger');
+        const navMenu = document.getElementById('navMenu');
+        
+        if (hamburger) {
+            hamburger.addEventListener('click', () => {
+                hamburger.classList.toggle('active');
+                navMenu.classList.toggle('active');
+            });
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const appId = urlParams.get('id') || 'SS-2024-' + Math.floor(1000 + Math.random() * 9000);
+        document.getElementById('applicationId').textContent = appId;
+    </script>
+</body>
+</html>
