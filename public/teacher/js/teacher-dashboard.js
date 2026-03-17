@@ -419,6 +419,15 @@ function getLocalDateString(date) {
     return `${year}-${month}-${day}`;
 }
 
+function getUTCDateString(date) {
+    if (!date) return '-';
+    const d = new Date(date);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function formatDate(dateString) {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -1243,7 +1252,7 @@ function renderAcademicCalendar() {
 
         // Find holiday/event for this specific date
         const items = academicData.filter(h => {
-            const hDate = getLocalDateString(h.date);
+            const hDate = getUTCDateString(h.date);
             return hDate === dateStr;
         });
 
