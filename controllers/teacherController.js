@@ -3,6 +3,8 @@ const Mark = require("../models/Mark");
 const Quiz = require("../models/Quiz");
 const SessionSlot = require("../models/SessionSlot");
 const TeacherAvailability = require("../models/TeacherAvailability");
+const PublicHoliday = require("../models/PublicHoliday");
+const ClassSubject = require("../models/ClassSubject");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const csv = require("csv-parser");
@@ -10,20 +12,104 @@ const bcrypt = require("bcryptjs");
 const sendEmail = require("../utils/sendEmail");
 const emailTemplates = require("../config/emailTemplates");
 
+/**
+ * Helper function to normalize class value
+ * Extracts numeric class value from various formats ("11", "Class 11", "class 11")
+ * @param {string} classValue - The class value to normalize
+ * @returns {string|null} - The normalized numeric class value or null
+ */
+function normalizeClassValue(classValue) {
+  if (!classValue) return null;
+  const str = String(classValue).trim();
+  // Extract numeric part from strings like "Class 11", "class 11", "11"
+  const match = str.match(/(\d+)/);
+  return match ? match[1] : str;
+}
+
+/**
+ * Helper function to check if a student's class matches any of the assigned classes
+ * @param {string} studentClass - The student's class value
+ * @param {Array} assignedClasses - Array of assigned ClassSubject objects
+ * @returns {boolean} - True if class matches any assigned class
+ */
+function isClassMatch(studentClass, assignedClasses) {
+  if (!studentClass) return false;
+  const normalizedStudentClass = normalizeClassValue(studentClass);
+  return assignedClasses.some(cls => {
+    const normalizedClassValue = normalizeClassValue(cls.class);
+    return normalizedStudentClass === normalizedClassValue;
+  });
+}
+
 exports.getTeacherStats = async (req, res) => {
   try {
     const teacherId = req.user.id;
+    const teacherMongoId = req.user._id.toString();
 
-    const totalStudents = await User.countDocuments({ role: "student", teacherId });
+    // Get all classes where the teacher is assigned
+    const assignedClasses = await ClassSubject.find({
+      $or: [
+        { "assignedTeacher.teacherId": teacherMongoId },
+        { "subjects.assignedTeacher.teacherId": teacherMongoId },
+        { "timetable.teacherId": teacherMongoId }
+      ]
+    }).lean();
+
+    if (!assignedClasses || assignedClasses.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          totalStudents: 0,
+          totalQuizzes: await Quiz.countDocuments({ teacherId }),
+          totalSessions: await SessionSlot.countDocuments({ teacherId }),
+          totalClasses: 0
+        }
+      });
+    }
+
+    // Get all unique class values assigned to this teacher
+    const assignedClassValues = assignedClasses.map(cls => normalizeClassValue(cls.class)).filter(Boolean);
+
+    // Calculate unique subjects assigned to this teacher
+    const uniqueSubjects = new Set();
+    assignedClasses.forEach(cls => {
+      if (cls.subjects) {
+        cls.subjects.forEach(sub => {
+          if (sub.assignedTeacher && sub.assignedTeacher.teacherId === teacherMongoId) {
+            uniqueSubjects.add(sub.name);
+          }
+        });
+      }
+      if (cls.timetable) {
+        cls.timetable.forEach(t => {
+          if (t.teacherId === teacherMongoId) {
+            uniqueSubjects.add(t.subjectName);
+          }
+        });
+      }
+    });
+    
+    // Fetch students only from User table - all student data is now stored here
+    const students = await User.find({
+      role: "student",
+      class: { $in: assignedClassValues.map(cv => new RegExp(cv, 'i')) }
+    }).select("class").lean();
+
+    // Filter students by class match
+    const validStudents = students.filter(s => isClassMatch(s.class, assignedClasses));
+
     const totalQuizzes = await Quiz.countDocuments({ teacherId });
     const totalSessions = await SessionSlot.countDocuments({ teacherId });
 
     res.json({
       success: true,
       data: {
-        totalStudents,
+        totalStudents: validStudents.length,
         totalQuizzes,
-        totalSessions
+        totalSessions,
+        totalClasses: assignedClasses.length,
+        totalSubjects: uniqueSubjects.size,
+        todayAttendance: 95 // Placeholder for now as simple per image
       }
     });
   } catch (err) {
@@ -34,43 +120,69 @@ exports.getTeacherStats = async (req, res) => {
 
 exports.getStudents = async (req, res) => {
   try {
-    const students = await User.find({ role: "student", teacherId: req.user.id }).select("-password");
-    res.json({ success: true, data: students });
+    const teacherMongoId = req.user._id.toString();
+
+    // Get all classes where the teacher is assigned
+    const assignedClasses = await ClassSubject.find({
+      $or: [
+        { "assignedTeacher.teacherId": teacherMongoId },
+        { "subjects.assignedTeacher.teacherId": teacherMongoId },
+        { "timetable.teacherId": teacherMongoId }
+      ]
+    }).lean();
+
+    if (!assignedClasses || assignedClasses.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Get all unique class values assigned to this teacher
+    const assignedClassValues = assignedClasses.map(cls => normalizeClassValue(cls.class)).filter(Boolean);
+    
+    // Fetch students only from User table - all student data is now stored here
+    const students = await User.find({
+      role: "student",
+      class: { $in: assignedClassValues.map(cv => new RegExp(cv, 'i')) }
+    }).select("-password").sort({ class: 1, rollNo: 1 }).lean();
+
+    // Filter students by class match
+    const filteredStudents = students.filter(s => isClassMatch(s.class, assignedClasses));
+
+    res.json({ success: true, data: filteredStudents });
   } catch (err) {
     console.error("Get students error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-exports.getMyStudents = async (req, res) => {
-  try {
-    const students = await User.find({ role: "student", teacherId: req.user.id }).select("-password");
-    res.json(students);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
 exports.getStudentById = async (req, res) => {
   try {
     const studentId = req.params.userId;
+    const teacherMongoId = req.user._id.toString();
 
-    // Try to find by MongoDB _id first, then by userId
-    let student = await User.findOne({
-      _id: studentId,
-      role: "student",
-      teacherId: req.user.id
-    }).select("-password");
+    // Get all classes where the teacher is assigned
+    const assignedClasses = await ClassSubject.find({
+      $or: [
+        { "assignedTeacher.teacherId": teacherMongoId },
+        { "subjects.assignedTeacher.teacherId": teacherMongoId },
+        { "timetable.teacherId": teacherMongoId }
+      ]
+    }).lean();
 
-    // If not found by _id, try by userId
-    if (!student) {
-      student = await User.findOne({
-        userId: studentId,
-        role: "student",
-        teacherId: req.user.id
-      }).select("-password");
+    if (!assignedClasses || assignedClasses.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found or not in your classes"
+      });
     }
+
+    // Try to find student by MongoDB _id or userId
+    let student = await User.findOne({
+      $or: [
+        { _id: mongoose.Types.ObjectId.isValid(studentId) ? studentId : new mongoose.Types.ObjectId() },
+        { userId: studentId }
+      ],
+      role: "student"
+    }).select("-password");
 
     if (!student) {
       return res.status(404).json({
@@ -79,21 +191,69 @@ exports.getStudentById = async (req, res) => {
       });
     }
 
+    // Check if student belongs to any of the teacher's assigned classes
+    const studentClassMatch = isClassMatch(student.class, assignedClasses);
+
+    if (!studentClassMatch) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found or not in your classes"
+      });
+    }
+
+    // All student data is now in the User table - no need to fetch from Admission
+    const studentObj = student.toObject();
+    
+    // Build address string from stored fields
+    const addressParts = [
+      studentObj.streetAddress,
+      studentObj.city,
+      studentObj.state,
+      studentObj.zipCode,
+      studentObj.country
+    ].filter(Boolean);
+    
+    studentObj.address = addressParts.join(', ') || null;
+
     return res.status(200).json({
       success: true,
-      message: "Get student by Teacher successful",
-      data: student
+      message: "Get student successful",
+      data: studentObj
     });
   }
   catch (err) {
+    console.error("Get student by ID error:", err);
     return res.status(500).json({
       success: false,
       message: "Server error"
     });
   }
 };
+/**
+ * Generate the next roll number for a class
+ * Roll numbers start from 1 and auto-increment within each class
+ * @param {string} className - The class name
+ * @returns {number} - The next roll number
+ */
+async function generateRollNumber(className) {
+  try {
+    // Find the highest roll number in this class
+    const lastStudent = await User.findOne({ 
+      role: 'student', 
+      class: className,
+      rollNo: { $exists: true, $ne: null }
+    }).sort({ rollNo: -1 }).lean();
+    
+    // Return next roll number (start from 1 if no students exist)
+    return lastStudent && lastStudent.rollNo ? lastStudent.rollNo + 1 : 1;
+  } catch (error) {
+    console.error('Error generating roll number:', error);
+    return 1;
+  }
+}
+
 exports.createStudent = async (req, res) => {
-  const { userId, name, email, password, age, class: className, city, state, country, mobileNumber, role, timezone } = req.body;
+  const { userId, name, email, password, age, class: className, city, state, country, mobileNumber, role, timezone, gender, parentName, parentRelationship, parentPhone, dob } = req.body;
 
   try {
     const exists = await User.findOne({ $or: [{ userId }, { email }] });
@@ -102,6 +262,9 @@ exports.createStudent = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Generate roll number for the class
+    const rollNo = await generateRollNumber(className);
 
     const studentData = {
       role: "student",
@@ -111,10 +274,16 @@ exports.createStudent = async (req, res) => {
       password: hashedPassword,
       age,
       class: className,
-      city,
-      state,
-      country,
-      mobileNumber,
+      rollNo,
+      gender: gender || undefined,
+      dob: dob || undefined,
+      parentName: parentName || '',
+      parentRelationship: parentRelationship || '',
+      parentPhone: parentPhone || '',
+      city: city || '',
+      state: state || '',
+      country: country || '',
+      mobileNumber: mobileNumber || '',
       timezone: timezone || "Asia/Kolkata",
       teacherId: req.user.id,
       profileImage: req.file ? `/uploads/profiles/${req.file.filename}` : ""
@@ -161,6 +330,57 @@ exports.updateStudent = async (req, res) => {
   try {
     const { name, email, age, class: className, city, state, country, timezone, mobileNumber } = req.body;
     const studentId = req.params.userId;
+    const teacherMongoId = req.user._id.toString();
+
+    // Get all classes where the teacher is assigned
+    const assignedClasses = await ClassSubject.find({
+      $or: [
+        { "assignedTeacher.teacherId": teacherMongoId },
+        { "subjects.assignedTeacher.teacherId": teacherMongoId },
+        { "timetable.teacherId": teacherMongoId }
+      ]
+    }).lean();
+
+    if (!assignedClasses || assignedClasses.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found or not in your classes"
+      });
+    }
+
+    // First find the student
+    const existingStudent = await User.findOne({
+      $or: [
+        { _id: mongoose.Types.ObjectId.isValid(studentId) ? studentId : new mongoose.Types.ObjectId() },
+        { userId: studentId }
+      ],
+      role: "student"
+    });
+
+    if (!existingStudent) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found"
+      });
+    }
+
+    // Check if student belongs to any of the teacher's assigned classes
+    const studentClassMatch = isClassMatch(existingStudent.class, assignedClasses);
+    
+    // Also check admission record if exists
+    const admission = await Admission.findOne({
+      email: existingStudent.email,
+      status: "approved"
+    }).select("class").lean();
+    
+    const admissionClassMatch = admission ? isClassMatch(admission.class, assignedClasses) : false;
+
+    if (!studentClassMatch && !admissionClassMatch) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found or not in your classes"
+      });
+    }
 
     const update = {};
     if (name) update.name = name;
@@ -174,7 +394,7 @@ exports.updateStudent = async (req, res) => {
     if (email) {
       const emailExists = await User.findOne({
         email: email.toLowerCase().trim(),
-        _id: { $ne: studentId }
+        _id: { $ne: existingStudent._id }
       });
 
       if (emailExists) {
@@ -190,28 +410,12 @@ exports.updateStudent = async (req, res) => {
       update.profileImage = `/uploads/profiles/${req.file.filename}`;
     }
 
-    // Try to find and update by MongoDB _id first, then by userId
-    let student = await User.findOneAndUpdate(
-      { _id: studentId, role: "student", teacherId: req.user.id },
+    // Update the student
+    const student = await User.findByIdAndUpdate(
+      existingStudent._id,
       update,
       { new: true }
     ).select("-password");
-
-    // If not found by _id, try by userId
-    if (!student) {
-      student = await User.findOneAndUpdate(
-        { userId: studentId, role: "student", teacherId: req.user.id },
-        update,
-        { new: true }
-      ).select("-password");
-    }
-
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found"
-      });
-    }
 
     res.json({
       success: true,
@@ -226,27 +430,55 @@ exports.updateStudent = async (req, res) => {
 exports.deleteStudent = async (req, res) => {
   try {
     const studentId = req.params.userId;
+    const teacherMongoId = req.user._id.toString();
 
-    // Try to find by MongoDB _id first, then by userId
-    let student = await User.findOne({
-      _id: studentId,
-      role: "student",
-      teacherId: req.user.id
-    });
+    // Get all classes where the teacher is assigned
+    const assignedClasses = await ClassSubject.find({
+      $or: [
+        { "assignedTeacher.teacherId": teacherMongoId },
+        { "subjects.assignedTeacher.teacherId": teacherMongoId },
+        { "timetable.teacherId": teacherMongoId }
+      ]
+    }).lean();
 
-    // If not found by _id, try by userId
-    if (!student) {
-      student = await User.findOne({
-        userId: studentId,
-        role: "student",
-        teacherId: req.user.id
+    if (!assignedClasses || assignedClasses.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found or not in your classes"
       });
     }
+
+    // First find the student
+    const student = await User.findOne({
+      $or: [
+        { _id: mongoose.Types.ObjectId.isValid(studentId) ? studentId : new mongoose.Types.ObjectId() },
+        { userId: studentId }
+      ],
+      role: "student"
+    });
 
     if (!student) {
       return res.status(404).json({
         success: false,
         message: "Student not found"
+      });
+    }
+
+    // Check if student belongs to any of the teacher's assigned classes
+    const studentClassMatch = isClassMatch(student.class, assignedClasses);
+    
+    // Also check admission record if exists
+    const admission = await Admission.findOne({
+      email: student.email,
+      status: "approved"
+    }).select("class").lean();
+    
+    const admissionClassMatch = admission ? isClassMatch(admission.class, assignedClasses) : false;
+
+    if (!studentClassMatch && !admissionClassMatch) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found or not in your classes"
       });
     }
 
@@ -341,17 +573,67 @@ exports.deleteMark = async (req, res) => {
   }
 };
 
+exports.getMyProfile = async (req, res) => {
+  try {
+    const teacher = await User.findOne({
+      userId: req.user.userId,
+      role: "teacher"
+    }).select("-password -__v").lean();
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Teacher not found"
+      });
+    }
+
+    const profileData = {
+      id: teacher._id,
+      employee_id: teacher.userId,
+      userId: teacher.userId,
+      name: teacher.name,
+      email: teacher.email,
+      phone: teacher.mobileNumber || "",
+      mobileNumber: teacher.mobileNumber || "",
+      city: teacher.city || "",
+      state: teacher.state || "",
+      country: teacher.country || "",
+      role: teacher.role,
+      profileImage: teacher.profileImage || "",
+      created_at: teacher.createdAt,
+      updated_at: teacher.updatedAt,
+      createdAt: teacher.createdAt,
+      updatedAt: teacher.updatedAt
+    };
+
+    return res.json({
+      success: true,
+      data: profileData
+    });
+  } catch (err) {
+    console.error("Get teacher profile error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
 exports.updateMyProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
 
     const update = {};
 
-    if (req.body.name) update.name = req.body.name;
-    if (req.body.city) update.city = req.body.city;
-    if (req.body.state) update.state = req.body.state;
-    if (req.body.country) update.country = req.body.country;
-    if (req.body.mobileNumber) update.mobileNumber = req.body.mobileNumber;
+    if (req.body.name !== undefined) update.name = req.body.name;
+    if (req.body.city !== undefined) update.city = req.body.city;
+    if (req.body.state !== undefined) update.state = req.body.state;
+    if (req.body.country !== undefined) update.country = req.body.country;
+
+    const resolvedPhone = req.body.mobileNumber !== undefined
+      ? req.body.mobileNumber
+      : req.body.phone;
+    if (resolvedPhone !== undefined) update.mobileNumber = resolvedPhone;
 
     if (req.body.email) {
       const emailExists = await User.findOne({
@@ -382,8 +664,26 @@ exports.updateMyProfile = async (req, res) => {
     }
 
     res.json({
+      success: true,
       message: "Profile updated successfully",
-      teacher
+      data: {
+        id: teacher._id,
+        employee_id: teacher.userId,
+        userId: teacher.userId,
+        name: teacher.name,
+        email: teacher.email,
+        phone: teacher.mobileNumber || "",
+        mobileNumber: teacher.mobileNumber || "",
+        city: teacher.city || "",
+        state: teacher.state || "",
+        country: teacher.country || "",
+        role: teacher.role,
+        profileImage: teacher.profileImage || "",
+        created_at: teacher.createdAt,
+        updated_at: teacher.updatedAt,
+        createdAt: teacher.createdAt,
+        updatedAt: teacher.updatedAt
+      }
     });
   } catch (err) {
     console.error(err);
@@ -619,23 +919,16 @@ exports.getQuizAttempts = async (req, res) => {
 
     const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    // Include all assigned students (teacher's students, scoped to quiz class if present)
-    const baseAssignedQuery = { teacherId, role: "student" };
+    // Include all students belonging to the quiz class
     const className = (quiz.class || "").trim();
 
-    let assignedStudentsQuery = { ...baseAssignedQuery };
+    let assignedStudentsQuery = { role: "student" };
     if (className) {
       // tolerate casing / extra spaces (common data issue)
       assignedStudentsQuery.class = new RegExp(`^\\s*${escapeRegex(className)}\\s*$`, "i");
     }
 
     let assignedStudents = await User.find(assignedStudentsQuery).select("name class").lean();
-
-    // Fallback: if class filter yields none, show all teacher students (prevents 0/0/0 UI)
-    if (assignedStudents.length === 0 && className) {
-      assignedStudentsQuery = { ...baseAssignedQuery };
-      assignedStudents = await User.find(assignedStudentsQuery).select("name class").lean();
-    }
 
     const assignedStudentIds = assignedStudents.map((s) => s._id);
 
@@ -701,5 +994,43 @@ exports.getQuizAttempts = async (req, res) => {
       success: false,
       message: err.message
     });
+  }
+};
+
+exports.getHolidays = async (req, res) => {
+  try {
+    const { academicYear } = req.query;
+    if (!academicYear) {
+      return res.status(400).json({ success: false, message: "Academic Year is required" });
+    }
+
+    const holidays = await PublicHoliday.find({
+      academicYear,
+      type: "holiday"
+    }).sort({ date: 1 });
+
+    res.json({ success: true, data: holidays });
+  } catch (err) {
+    console.error("Get holidays error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getEvents = async (req, res) => {
+  try {
+    const { academicYear } = req.query;
+    if (!academicYear) {
+      return res.status(400).json({ success: false, message: "Academic Year is required" });
+    }
+
+    const events = await PublicHoliday.find({
+      academicYear,
+      type: "event"
+    }).sort({ date: 1 });
+
+    res.json({ success: true, data: events });
+  } catch (err) {
+    console.error("Get events error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
