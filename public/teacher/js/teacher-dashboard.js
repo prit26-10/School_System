@@ -283,9 +283,10 @@ function loadPage(page, title = null) {
         'enter-marks': renderEnterMarks,
         'view-results': renderViewResults,
         'submit-results': renderSubmitResults,
-        'view-attendance': renderViewAttendance,
-        'edit-attendance': renderEditAttendance,
-        'submit-attendance': renderSubmitAttendance,
+        'view-attendance': renderAttendancePage,
+        'edit-attendance': renderAttendancePage,
+        'submit-attendance': renderAttendancePage,
+        'attendance': renderAttendancePage,
 
         'weekly-schedule': renderWeeklySchedule,
         'assigned-classes': renderAssignedClasses,
@@ -356,6 +357,8 @@ function initializePageScripts(page) {
         initializeManageLiveClass();
     } else if (page === 'join-live-class') {
         initializeJoinLiveClass();
+    } else if (page === 'attendance' || page === 'view-attendance' || page === 'edit-attendance' || page === 'submit-attendance') {
+        initializeAttendancePage();
     }
 }
 
@@ -425,9 +428,349 @@ function formatDate(dateString) {
     });
 }
 
+/// ============================================
+// ATTENDANCE PAGE
 // ============================================
-// PAGE RENDER FUNCTIONS
-// ============================================
+
+function renderAttendancePage() {
+    return `
+        <div style="width:100%;">
+            <div style="background:#fff; border-radius:16px; padding:32px 36px; box-shadow:0 1px 4px rgba(0,0,0,0.06); border:1px solid #e2e8f0;">
+                <!-- Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; flex-wrap:wrap; gap:16px;">
+                    <div>
+                        <h2 style="margin:0; font-size:22px; font-weight:700; color:#0f172a;">Attendance Records</h2>
+                        <p style="margin:5px 0 0; color:#64748b; font-size:14px;">Session-wise attendance — click any row to view student details</p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <label for="attendance-class-filter" style="font-size:14px; font-weight:500; color:#374151; white-space:nowrap;">Filter by Class:</label>
+                        <select id="attendance-class-filter" onchange="loadAttendanceForClass(this.value)"
+                            style="padding:9px 16px; border:1px solid #e2e8f0; border-radius:10px; font-size:14px; color:#374151; background:#f8fafc; min-width:170px; cursor:pointer; outline:none;">
+                            <option value="">All Classes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Records Table -->
+                <div id="attendance-records-container">
+                    <div style="text-align:center; padding:48px; color:#94a3b8;">
+                        <div style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:#0A66FF;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px;"></div>
+                        <p style="margin:0;font-size:14px;">Loading attendance records...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Attendance Detail Modal -->
+        <div id="attendance-detail-modal" onclick="if(event.target===this)closeAttendanceDetailModal()" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(15,23,42,0.45);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:16px;width:680px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,0.12);overflow:hidden;">
+                <!-- Modal Header -->
+                <div style="background:#fff;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid #f1f5f9;">
+                    <div>
+                        <div id="adm-subject" style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:2px;"></div>
+                        <div id="adm-meta" style="font-size:13px;color:#64748b;"></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <button onclick="downloadAttendancePDF()" style="padding:9px 18px;background:#0A66FF;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background 0.15s;" onmouseover="this.style.background='#0052cc'" onmouseout="this.style.background='#0A66FF'">
+                            <i class="fas fa-download"></i> Download PDF
+                        </button>
+                        <button onclick="closeAttendanceDetailModal()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;transition:color 0.15s;" onmouseover="this.style.color='#475569'" onmouseout="this.style.color='#94a3b8'">&times;</button>
+                    </div>
+                </div>
+                <!-- Summary Chips -->
+                <div style="padding:16px 28px;background:#fff;border-bottom:1px solid #f1f5f9;display:flex;gap:12px;flex-shrink:0;">
+                    <span id="adm-present-chip" style="display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;color:#047857;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;"></span>
+                    <span id="adm-absent-chip" style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;color:#b91c1c;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;"></span>
+                    <span id="adm-total-chip" style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;color:#475569;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid #e2e8f0;"></span>
+                </div>
+                <!-- Student Table -->
+                <div id="adm-body" style="overflow-y:auto;flex:1;padding:0;min-height:200px;"></div>
+
+            </div>
+        </div>
+    `;
+}
+
+// Holds the session data currently displayed in the detail modal (for PDF export)
+let _currentDetailSession = null;
+
+async function initializeAttendancePage() {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/teachers/assigned-classes', { headers: { 'Authorization': `Bearer ${token}` } });
+        const result = await res.json();
+
+        const select = document.getElementById('attendance-class-filter');
+        if (select && result.success && result.data && result.data.length > 0) {
+            result.data.forEach(cls => {
+                const opt = document.createElement('option');
+                opt.value = cls._id;
+                opt.textContent = cls.name || cls.class || cls._id;
+                select.appendChild(opt);
+            });
+        }
+
+        await loadAttendanceForClass('');
+    } catch (err) {
+        console.error('Error initializing attendance page:', err);
+        const container = document.getElementById('attendance-records-container');
+        if (container) container.innerHTML = Components.ErrorState('Failed to load attendance data');
+    }
+}
+
+async function loadAttendanceForClass(classId) {
+    const container = document.getElementById('attendance-records-container');
+    if (!container) return;
+
+    container.innerHTML = `<div style="text-align:center;padding:48px;color:#94a3b8;">
+        <div style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:#0A66FF;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px;"></div>
+        <p style="margin:0;font-size:14px;">Loading...</p></div>`;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/live-session/my-sessions?limit=100', { headers: { 'Authorization': `Bearer ${token}` } });
+        const result = await res.json();
+
+        if (!result.success || !result.data || result.data.length === 0) {
+            container.innerHTML = Components.EmptyState('clipboard-list', 'No Records Found', 'No live sessions found. Attendance will appear here once sessions are completed.');
+            return;
+        }
+
+        let sessions = result.data;
+        if (classId) {
+            sessions = sessions.filter(s => {
+                const sid = s.classId && s.classId._id ? s.classId._id.toString() : (s.classId ? s.classId.toString() : '');
+                return sid === classId;
+            });
+        }
+
+        sessions = sessions.filter(s => s.status === 'ended' || s.status === 'live');
+
+        if (sessions.length === 0) {
+            container.innerHTML = Components.EmptyState('calendar-check', 'No Records Found', 'No completed sessions found for the selected class.');
+            return;
+        }
+
+        // Store sessions for modal access
+        window._attendanceSessions = sessions;
+
+        const rows = sessions.map((session, idx) => {
+            const date = new Date(session.scheduledDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            const attendanceArr = session.attendance || [];
+            const presentCount = attendanceArr.filter(a => a.status === 'present').length;
+            const absentCount = attendanceArr.filter(a => a.status === 'absent').length;
+            const isLive = session.status === 'live';
+
+            return `
+                <tr onclick="openAttendanceDetailModal(${idx})" style="border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                    <td style="padding:16px 20px;font-weight:600;color:#0f172a;font-size:14px;">${escapeHtml(session.subjectName || '—')}</td>
+                    <td style="padding:16px 20px;color:#475569;font-size:14px;">${escapeHtml(session.className || '—')}</td>
+                    <td style="padding:16px 20px;color:#475569;font-size:14px;">${date}</td>
+                    <td style="padding:16px 20px;color:#475569;font-size:14px;">${session.startTime} – ${session.endTime}</td>
+                    <td style="padding:16px 20px;">
+                        <span style="display:inline-flex;align-items:center;gap:5px;background:#d1fae5;color:#059669;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;">
+                            <i class="fas fa-check-circle"></i> ${presentCount}
+                        </span>
+                    </td>
+                    <td style="padding:16px 20px;">
+                        <span style="display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#dc2626;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;">
+                            <i class="fas fa-times-circle"></i> ${absentCount}
+                        </span>
+                    </td>
+                    <td style="padding:16px 20px;">
+                        <span style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;
+                            background:${isLive ? '#fee2e2' : '#f1f5f9'};
+                            color:${isLive ? '#dc2626' : '#64748b'};">
+                            ${isLive ? '🔴 LIVE' : 'Completed'}
+                        </span>
+                    </td>
+                    <td style="padding:16px 20px;">
+                        <span style="display:inline-flex;align-items:center;gap:5px;color:#0A66FF;font-size:13px;font-weight:500;">
+                            <i class="fas fa-users"></i> View Students
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Subject</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Class</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Date</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Time</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Present</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Absent</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Status</th>
+                            <th style="padding:13px 20px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">Students</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    } catch (err) {
+        console.error('Error loading attendance:', err);
+        container.innerHTML = Components.ErrorState('Failed to load attendance records');
+    }
+}
+
+function openAttendanceDetailModal(sessionIdx) {
+    const sessions = window._attendanceSessions || [];
+    const session = sessions[sessionIdx];
+    if (!session) return;
+
+    _currentDetailSession = session;
+
+    const attendanceArr = session.attendance || [];
+    const presentCount = attendanceArr.filter(a => a.status === 'present').length;
+    const absentCount = attendanceArr.filter(a => a.status === 'absent').length;
+    const total = attendanceArr.length;
+    const date = new Date(session.scheduledDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const subjEl = document.getElementById('adm-subject');
+    const metaEl = document.getElementById('adm-meta');
+    if (subjEl) subjEl.textContent = session.subjectName + ' — ' + session.className;
+    if (metaEl) metaEl.textContent = date + '  •  ' + session.startTime + ' – ' + session.endTime;
+
+    const pChip = document.getElementById('adm-present-chip');
+    const aChip = document.getElementById('adm-absent-chip');
+    const tChip = document.getElementById('adm-total-chip');
+    if (pChip) pChip.innerHTML = '<i class="fas fa-check-circle"></i> Present: ' + presentCount;
+    if (aChip) aChip.innerHTML = '<i class="fas fa-times-circle"></i> Absent: ' + absentCount;
+    if (tChip) tChip.innerHTML = '<i class="fas fa-users"></i> Total: ' + total;
+
+    const bodyEl = document.getElementById('adm-body');
+    if (bodyEl) {
+        if (attendanceArr.length === 0) {
+            bodyEl.innerHTML = '<div style="padding:48px;text-align:center;color:#94a3b8;"><i class="fas fa-users" style="font-size:36px;margin-bottom:12px;display:block;"></i><p style="margin:0;font-size:14px;">No student attendance recorded for this session.</p></div>';
+        } else {
+            const studentRows = attendanceArr.map((a, i) => {
+                const isPresent = a.status === 'present';
+                const isLate = a.status === 'late';
+                const statusColor = isPresent ? '#059669' : isLate ? '#d97706' : '#dc2626';
+                const statusBg = isPresent ? '#d1fae5' : isLate ? '#fef3c7' : '#fee2e2';
+                const statusLabel = isPresent ? 'Present' : isLate ? 'Late' : 'Absent';
+                const statusIcon = isPresent ? 'check-circle' : isLate ? 'clock' : 'times-circle';
+                return `
+                    <tr style="border-bottom:1px solid #f1f5f9;background:${i % 2 === 0 ? '#fff' : '#fafbfc'};">
+                        <td style="padding:15px 28px;">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div style="width:36px;height:36px;background:#eff6ff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-user" style="color:#0A66FF;font-size:13px;"></i>
+                                </div>
+                                <span style="font-weight:600;color:#0f172a;font-size:14px;">${escapeHtml(a.studentName || '—')}</span>
+                            </div>
+                        </td>
+                        <td style="padding:15px 28px;color:#475569;font-size:14px;">${escapeHtml(session.className || '—')}</td>
+                        <td style="padding:15px 28px;">
+                            <span style="display:inline-flex;align-items:center;gap:6px;background:${statusBg};color:${statusColor};padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;">
+                                <i class="fas fa-${statusIcon}"></i> ${statusLabel}
+                            </span>
+                        </td>
+                    </tr>`;
+            }).join('');
+
+            bodyEl.innerHTML = `
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;position:sticky;top:0;">
+                            <th style="padding:14px 28px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;width:45%;">Student Name</th>
+                            <th style="padding:14px 28px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;width:25%;">Class</th>
+                            <th style="padding:14px 28px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;width:30%;">Attendance Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${studentRows}</tbody>
+                </table>`;
+        }
+    }
+
+    const modal = document.getElementById('attendance-detail-modal');
+    if (modal) {
+        // Use fitTimeout to let current click event finish, preventing click overlay race condition
+        setTimeout(() => {
+            modal.style.display = 'flex';
+        }, 50);
+    }
+}
+
+function closeAttendanceDetailModal() {
+    const modal = document.getElementById('attendance-detail-modal');
+    if (modal) modal.style.display = 'none';
+    _currentDetailSession = null;
+}
+
+function downloadAttendancePDF() {
+    const session = _currentDetailSession;
+    if (!session) return;
+
+    if (typeof html2pdf === 'undefined') {
+        showToast('PDF library not loaded yet.', 'error');
+        return;
+    }
+
+    const attendanceArr = session.attendance || [];
+    const date = new Date(session.scheduledDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const presentCount = attendanceArr.filter(a => a.status === 'present').length;
+    const absentCount = attendanceArr.filter(a => a.status === 'absent').length;
+
+    const rows = attendanceArr.map((a, i) => {
+        const isPresent = a.status === 'present';
+        const isLate = a.status === 'late';
+        const statusLabel = isPresent ? 'Present' : isLate ? 'Late' : 'Absent';
+        const statusColor = isPresent ? '#059669' : isLate ? '#d97706' : '#dc2626';
+        return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f8fafc'};"><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#374151;">${i + 1}</td><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#0f172a;font-weight:500;">${escapeHtml(a.studentName || '—')}</td><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#475569;">${escapeHtml(session.className || '—')}</td><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:600;color:${statusColor};">${statusLabel}</td></tr>`;
+    }).join('');
+
+    const printContent = `<div style="font-family:'Segoe UI',Arial,sans-serif;padding:30px;color:#0f172a;">
+        <div style="border-bottom:2px solid #0A66FF;padding-bottom:16px;margin-bottom:20px;">
+            <h1 style="margin:0;font-size:22px;color:#0A66FF;">Attendance Report</h1>
+            <p style="margin:4px 0 0;font-size:12px;color:#64748b;">SmartSchool &nbsp;•&nbsp; Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+        <div style="display:flex;gap:32px;margin-bottom:20px;">
+            <div style="font-size:12px;"><strong style="color:#64748b;display:block;text-transform:uppercase;font-size:11px;">Subject:</strong><span style="font-weight:600;">${escapeHtml(session.subjectName || '—')}</span></div>
+            <div style="font-size:12px;"><strong style="color:#64748b;display:block;text-transform:uppercase;font-size:11px;">Class:</strong><span style="font-weight:600;">${escapeHtml(session.className || '—')}</span></div>
+            <div style="font-size:12px;"><strong style="color:#64748b;display:block;text-transform:uppercase;font-size:11px;">Date:</strong><span style="font-weight:600;">${date}</span></div>
+            <div style="font-size:12px;"><strong style="color:#64748b;display:block;text-transform:uppercase;font-size:11px;">Time:</strong><span style="font-weight:600;">${session.startTime} – ${session.endTime}</span></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:24px;">
+            <div style="background:#d1fae5;color:#059669;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;">✔ Present: ${presentCount}</div>
+            <div style="background:#fee2e2;color:#dc2626;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;">✖ Absent: ${absentCount}</div>
+            <div style="background:#f1f5f9;color:#475569;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;">Total: ${attendanceArr.length}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:#0A66FF;color:#fff;">
+                <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;">#</th>
+                <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;">Student Name</th>
+                <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;">Class</th>
+                <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;">Attendance Status</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
+
+    const element = document.createElement('div');
+    element.innerHTML = printContent;
+    document.body.appendChild(element);
+
+    const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Attendance_${session.subjectName || 'Report'}_${session.className || ''}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().from(element).set(opt).save().then(() => {
+        document.body.removeChild(element);
+    }).catch(err => {
+        console.error('PDF Generation Error:', err);
+        showToast('Failed to generate PDF', 'error');
+        document.body.removeChild(element);
+    });
+}
 
 function renderDashboard() {
     return `
@@ -2794,6 +3137,7 @@ function renderSubmissionsMarks() {
                                 </label>
                             </th>
                             <th>Student</th>
+                            <th>Class</th>
                             <th>Assignment</th>
                             <th>Submitted On</th>
                             <th>Status</th>
@@ -2803,7 +3147,7 @@ function renderSubmissionsMarks() {
                     </thead>
                     <tbody id="submissions-table-body">
                         <tr>
-                            <td colspan="7" class="loading-cell">
+                            <td colspan="8" class="loading-cell">
                                 <div class="loading-spinner"></div>
                                 <p>Loading submissions...</p>
                             </td>
@@ -3076,7 +3420,7 @@ function renderSubmissionsTable(submissions) {
     if (!submissions || submissions.length === 0) {
         const emptyState = `
             <tr>
-                <td colspan="7">
+                <td colspan="8">
                     <div class="assignments-empty-state">
                         <i class="fas fa-inbox"></i>
                         <h3>No Submissions Yet</h3>
@@ -3132,12 +3476,15 @@ function renderSubmissionsTable(submissions) {
                 <td>
                     <div class="student-details-modern">
                         <div class="student-name-modern">${escapeHtmlFn(submission.studentName)}</div>
-                        <div class="student-roll-modern">${escapeHtmlFn(submission.studentUserId)}</div>
+                        <div style="font-size: 11px; color: #64748b;">${escapeHtmlFn(submission.studentUserId)}</div>
                     </div>
                 </td>
                 <td>
+                    <span class="class-pill" style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">${escapeHtmlFn(submission.assignment.class)}</span>
+                </td>
+                <td>
                     <div class="class-subject-modern">
-                        <span class="subject-text">${escapeHtmlFn(submission.assignment.title)}</span>
+                        <span class="subject-text" style="font-weight: 500;">${escapeHtmlFn(submission.assignment.title)}</span>
                     </div>
                 </td>
                 <td>
@@ -3558,12 +3905,12 @@ async function deleteAssignment(assignmentId) {
 function viewAssignmentFile(assignmentId) {
     // Find the assignment in the current data
     const assignment = assignmentsData.find(a => a._id === assignmentId);
-    
+
     if (!assignment) {
         showToast('Assignment not found', 'error');
         return;
     }
-    
+
     // Check if assignment has a file
     if (assignment.fileUrl || assignment.filePath) {
         const fileUrl = assignment.fileUrl || assignment.filePath;
@@ -3851,3 +4198,113 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ------------------------------------------------
+// Evaluate Submission Handlers
+// ------------------------------------------------
+
+window.openEvaluationModal = function (submissionId) {
+    const modal = document.getElementById('evaluation-modal');
+    if (!modal) return;
+
+    const submission = submissionsData.find(s => s._id === submissionId);
+    if (!submission) return;
+
+    document.getElementById('evaluation-submission-id').value = submissionId;
+    document.getElementById('evaluation-marks').value = submission.marks !== null ? submission.marks : '';
+    document.getElementById('evaluation-total-marks').value = submission.assignment.totalMarks;
+    document.getElementById('evaluation-feedback').value = submission.feedback || '';
+
+    const info = document.getElementById('evaluation-submission-info');
+    if (info) {
+        info.innerHTML = `
+            <div style="margin-bottom: 15px; font-size: 14px; color: #475569; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="margin-bottom: 4px;"><strong>Student:</strong> ${submission.studentName}</div>
+                <div style="margin-bottom: 4px;"><strong>Assignment:</strong> ${submission.assignment.title}</div>
+                <div><strong>Submitted On:</strong> ${new Date(submission.submissionDate).toLocaleString()}</div>
+            </div>
+        `;
+    }
+
+    const preview = document.getElementById('evaluation-submission-preview');
+    if (preview) {
+        if (submission.fileUrl) {
+            preview.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <span style="font-size: 13px; color: #64748b;"><i class="fas fa-paperclip"></i> Attachment Included</span>
+                    <a href="${submission.fileUrl}" target="_blank" rel="noopener noreferrer" style="background: white; border: 1px solid #e2e8f0; padding: 10px 16px; border-radius: 8px; text-decoration: none; color: #0088cc; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s;" onmouseover="this.style.background='#f8fafc';this.style.transform='translateY(-1px)';" onmouseout="this.style.background='white';this.style.transform='none';">
+                        <i class="fas fa-file-pdf" style="color: #ef4444; font-size: 15px;"></i> View Submission File
+                    </a>
+                </div>
+            `;
+        } else {
+            preview.innerHTML = '<span style="color: #94a3b8; font-size: 13px; font-style: italic;">No file attached.</span>';
+        }
+    }
+
+    modal.style.display = 'flex';
+};
+
+window.closeEvaluationModal = function () {
+    const modal = document.getElementById('evaluation-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.saveEvaluation = async function (action = 'save') {
+    const submissionId = document.getElementById('evaluation-submission-id').value;
+    const marks = document.getElementById('evaluation-marks').value;
+    const feedback = document.getElementById('evaluation-feedback').value;
+
+    if (marks === '') {
+        alert('Please enter marks');
+        return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+        // 1. Save Evaluation Marks
+        const response = await fetch(`/api/assignments/submissions/${submissionId}/evaluate`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ marks: Number(marks), feedback })
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            alert(result.message || 'Failed to save evaluation');
+            return;
+        }
+
+        // 2. If action is "publish", call publish endpoint for SINGLE ID
+        if (action === 'publish') {
+            const publishResponse = await fetch('/api/assignments/submissions/publish', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ submissionIds: [submissionId] })
+            });
+
+            const publishResult = await publishResponse.json();
+            if (!publishResult.success) {
+                alert(publishResult.message || 'Saved but failed to publish.');
+                closeEvaluationModal();
+                if (typeof fetchAllSubmissions === 'function') fetchAllSubmissions();
+                return;
+            }
+            if (typeof showToast === 'function') showToast('Marks saved & Published successfully!', 'success');
+        } else {
+            if (typeof showToast === 'function') showToast('Evaluation saved successfully', 'success');
+        }
+
+        closeEvaluationModal();
+        if (typeof fetchAllSubmissions === 'function') fetchAllSubmissions();
+    } catch (error) {
+        console.error('Error saving evaluation:', error);
+        alert('Connection error');
+    }
+};

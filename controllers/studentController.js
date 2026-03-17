@@ -192,6 +192,55 @@ exports.getStudentStats = async (req, res) => {
   }
 };
 
+/**
+ * Get notices relevant to the student (from Admin and their Class Teacher)
+ */
+exports.getMyNotices = async (req, res) => {
+    try {
+        const student = await User.findById(req.user.id);
+        if (!student) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        // Student's class is stored in student.class
+        const studentClass = student.class;
+
+        const Notice = require("../models/Notice");
+        
+        // Find notices that:
+        // 1. Match new fields: target = "all_students"/"all_users" OR (target = "specific_class" AND class_id = studentClass)
+        // 2. Fallback for old notices: check recipientGroup and targetClass
+        const notices = await Notice.find({
+            $or: [
+                // New logic
+                { target: { $in: ["all_students", "all_users"] } },
+                { target: "specific_class", class_id: studentClass },
+                
+                // Backward compatibility logic
+                { 
+                    target: { $exists: false }, // Only apply fallback to old notices
+                    $or: [
+                        { recipientGroup: "All" },
+                        { recipientGroup: "Students", targetClass: { $in: [null, "All", ""] } },
+                        { recipientGroup: "Students", targetClass: studentClass }
+                    ]
+                }
+            ]
+        }).sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            notices
+        });
+    } catch (error) {
+        console.error("Error fetching student notices:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server Error while fetching notices"
+        });
+    }
+};
+
 exports.updateMyProfileImage = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "Image required" });

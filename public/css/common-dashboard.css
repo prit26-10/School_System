@@ -11,25 +11,25 @@
     --primary: #0A66FF;
     --primary-dark: #0052cc;
     --primary-light: #e6f0ff;
-    
+
     /* Neutral Colors */
     --white: #ffffff;
     --light-gray: #f8f9fa;
     --dark: #1a1a2e;
     --gray: #6c757d;
     --gray-light: #e9ecef;
-    
+
     /* Status Colors */
     --success: #28a745;
     --warning: #ffc107;
     --danger: #dc3545;
     --info: #17a2b8;
-    
+
     /* Effects */
     --gradient: linear-gradient(135deg, #0A66FF 0%, #1E88E5 100%);
     --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
-    
+
     /* Layout */
     --radius: 12px;
     --radius-sm: 8px;
@@ -43,34 +43,82 @@
    Animations
    -------------------------------------------------------------------------- */
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes slideOut {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(100%); opacity: 0; }
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
 }
 
 @keyframes slideInUp {
-    from { transform: translateY(30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes ring {
-    0%, 100% { transform: rotate(0deg); }
-    10%, 30%, 50%, 70%, 90% { transform: rotate(-10deg); }
-    20%, 40%, 60%, 80% { transform: rotate(10deg); }
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: rotate(-10deg);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: rotate(10deg);
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -138,6 +186,10 @@ body {
     border-radius: var(--radius-sm);
     color: var(--white);
     font-size: 18px;
+}
+
+.sidebar-logo .logo-icon i {
+    color: var(--white) !important;
 }
 
 .sidebar-logo .logo-text {
