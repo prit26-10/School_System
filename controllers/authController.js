@@ -4,76 +4,36 @@ const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
 const emailTemplates = require("../config/emailTemplates");
 
-exports.signup = async (req, res) => {
-  const { userId, name, email, password, city, state, country, role, mobileNumber, timezone } = req.body;
-
-  // Only allow teacher signup
-  if (role !== "teacher") {
-    return res.status(403).json({
-      success: false,
-      message: "Only teacher accounts can be created through public signup"
-    });
-  }
-
-  try {
-    const exists = await User.findOne({
-      $or: [{ userId }, { email }]
-    });
-
-    if (exists) {
-      return res.status(400).json({
-        success: false,
-        message: "UserId or Email already in use"
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await User.create({
-      role: "teacher",
-      userId,
-      name,
-      email,
-      password: hashedPassword,
-      city,
-      state,
-      country,
-      mobileNumber: mobileNumber || "",
-      timezone: timezone || "Asia/Kolkata",
-      profileImage: req.file ? `/uploads/profiles/${req.file.filename}` : ""
-    });
-
-    const userResponse = user.toObject();
-    delete userResponse.password;
-
-    /*setImmediate(async () => {
-      try {
-        await sendEmail({
-          to: email,
-          subject: emailTemplates.teacher_signup.subject,
-          html: emailTemplates.teacher_signup.html(name)
-        });
-      } catch (emailErr) {
-        console.error("Failed to send welcome email:", emailErr.message);
-      }
-    });*/
-
-    return res.status(201).json({
-      success: true,
-      message: "Signup successful.",
-      user: userResponse
-    });
-  } catch (err) {
-    console.error("Signup error:", err);
-    return res.status(500).json({ 
-      success: false,
-      message: "Server error" 
-    });
-  }
-};
-
 exports.login = async (req, res) => {
   const { email, password } = req.body;
+
+  // Static admin authentication
+  if (email === 'admin@gmail.com' && password === 'Admin123') {
+    const adminToken = jwt.sign(
+      {
+        id: 'admin-001',
+        userId: 'admin',
+        role: 'admin',
+        name: 'Admin',
+        email: 'admin@gmail.com'
+      },
+      process.env.JWT_SECRET || 'smartSchoolSecretKey2024',
+      { expiresIn: "50d" }
+    );
+
+    return res.json({
+      success: true,
+      message: "Login successful",
+      token: adminToken,
+      user: {
+        id: 'admin-001',
+        userId: 'admin',
+        name: 'Admin',
+        email: 'admin@gmail.com',
+        role: 'admin'
+      }
+    });
+  }
 
   try {
     const user = await User.findOne({ email });
@@ -132,10 +92,32 @@ exports.logout = (req, res) => {
   });
 };
 
-exports.getProfile = async (req, res) => {
+exports.changePassword = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
-    
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password, new password, and confirm password are required"
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password do not match"
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters"
+      });
+    }
+
+    const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -143,15 +125,34 @@ exports.getProfile = async (req, res) => {
       });
     }
 
-    return res.status(200).json({
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect"
+      });
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be different from current password"
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.json({
       success: true,
-      data: user
+      message: "Password updated successfully"
     });
   } catch (err) {
-    console.error("Profile error:", err);
-    return res.status(500).json({ 
+    console.error("Change password error:", err);
+    return res.status(500).json({
       success: false,
-      message: "Server error" 
+      message: "Server error"
     });
   }
 };

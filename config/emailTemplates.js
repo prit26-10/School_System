@@ -1,15 +1,4 @@
 const emailTemplates = {
-    teacher_signup: {
-        subject: "Welcome to the School System",
-        html: (teacherName) => `
-            <h2>Welcome ${teacherName}!</h2>
-            <p>Your teacher account has been successfully created.</p>
-            <p>You can now log in to your dashboard and start managing sessions and students.</p>
-            <br/>
-            <p>Best regards,<br/>School System Team</p>
-        `
-    },
-    
     student_added: {
         teacher: {
             subject: "Student Added Successfully",
