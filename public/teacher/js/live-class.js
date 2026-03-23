@@ -7,6 +7,7 @@
 let todayScheduleData = [];
 let liveSessionsData = [];
 let currentAttendanceSessionId = null; // tracks which session's attendance modal is open
+let liveClassRefreshInterval = null; // Polling interval
 
 /**
  * Render Manage Live Class Page
@@ -131,7 +132,7 @@ function renderManageLiveClass() {
                 color: #dc2626;
                 animation: pulse 2s infinite;
             }
-            .status-ended {
+            .status-ended, .status-completed {
                 background: #f1f5f9;
                 color: #94a3b8;
             }
@@ -325,13 +326,48 @@ function renderJoinLiveClass() {
 async function initializeManageLiveClass() {
     await fetchTodayScheduleWithLiveStatus();
     await fetchLiveSessions();
+    startLiveClassPolling(); // Start polling
 }
+
+function stopLiveClassPolling() {
+    if (liveClassRefreshInterval) {
+        clearInterval(liveClassRefreshInterval);
+        liveClassRefreshInterval = null;
+    }
+}
+
+function startLiveClassPolling() {
+    if (!liveClassRefreshInterval) {
+        liveClassRefreshInterval = setInterval(async () => {
+            const container = document.getElementById('today-classes-container');
+            if (container) {
+                await fetchTodayScheduleWithLiveStatus(); 
+            } else {
+                stopLiveClassPolling();
+            }
+        }, 5000); // 5 seconds
+    }
+}
+
+let activeJoinPollingInterval = null;
 
 /**
  * Initialize Join Live Class page
  */
 async function initializeJoinLiveClass() {
     await fetchActiveSessionsForJoin();
+    
+    if (!activeJoinPollingInterval) {
+        activeJoinPollingInterval = setInterval(() => {
+            const container = document.getElementById('active-sessions-container');
+            if (container) {
+                fetchActiveSessionsForJoin(true);
+            } else {
+                clearInterval(activeJoinPollingInterval);
+                activeJoinPollingInterval = null;
+            }
+        }, 5000);
+    }
 }
 
 /**
@@ -343,11 +379,11 @@ async function fetchTodayScheduleWithLiveStatus() {
 
     try {
         const token = localStorage.getItem('token');
-        
+
         // Get today's day name
         const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const todayDay = days[new Date().getDay()];
-        
+
         // Get teacher info from token
         let teacherId = '';
         if (token) {
@@ -358,14 +394,14 @@ async function fetchTodayScheduleWithLiveStatus() {
                 console.error('Error parsing token:', e);
             }
         }
-        
+
         // Fetch teacher's assigned classes with timetable
         const response = await fetch('/api/teachers/assigned-classes', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const result = await response.json();
-        
+
         // Fetch today's live sessions
         const sessionsResponse = await fetch('/api/live-session/today', {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -380,7 +416,7 @@ async function fetchTodayScheduleWithLiveStatus() {
 
         // Extract today's classes from timetables
         const todayClasses = [];
-        
+
         if (result.data && result.data.length > 0) {
             result.data.forEach(classData => {
                 if (classData.timetable && classData.timetable.length > 0) {
@@ -392,7 +428,7 @@ async function fetchTodayScheduleWithLiveStatus() {
                             }
                             todayClasses.push({
                                 classId: classData._id,
-                                className: classData.name || classData.class,
+                                className: classData.class,
                                 subjectName: slot.subjectName,
                                 subjectCode: slot.subjectCode,
                                 startTime: slot.startTime,
@@ -432,14 +468,23 @@ function renderTodayClasses(classes) {
         const existingSession = liveSessionsData.find(s => {
             const sClassId = s.classId && s.classId._id ? s.classId._id.toString() : (s.classId ? s.classId.toString() : '');
             const cClassId = cls.classId ? cls.classId.toString() : '';
-            return sClassId === cClassId && 
-                   s.subjectName === cls.subjectName &&
-                   s.startTime === cls.startTime;
+            return sClassId === cClassId &&
+                s.subjectName === cls.subjectName &&
+                s.startTime === cls.startTime;
         });
 
         const hasLiveSession = !!existingSession;
-        const isLive = hasLiveSession && existingSession.status === 'live';
+
+        const now = new Date();
+        const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+        const [endH, endM] = cls.endTime.split(':').map(Number);
+        const endTotalMinutes = endH * 60 + endM;
+        const isPastEndTime = currentTotalMinutes > endTotalMinutes;
+
+        const isLive = hasLiveSession && existingSession.status === 'live' && !isPastEndTime;
+        const isCompleted = hasLiveSession && (existingSession.status === 'completed' || isPastEndTime);
         const isEnded = hasLiveSession && existingSession.status === 'ended';
+
 
         // Time restriction logic: enable button 10 mins before start up to end time
         let isTimeValid = false;
@@ -471,10 +516,10 @@ function renderTodayClasses(classes) {
                 <div class="class-card-header">
                     <div>
                         <h4 class="class-subject">${escapeHtml(cls.subjectName)}</h4>
-                        <p class="class-name">${escapeHtml(cls.className)}</p>
+                        <p class="class-name">Class: ${escapeHtml(cls.className)}</p>
                     </div>
-                    <span class="status-badge ${isLive ? 'status-live' : isEnded ? 'status-ended' : 'status-scheduled'}" style="${isEnded ? 'background: #d1fae5; color: #059669;' : ''}">
-                        ${isLive ? '🔴 LIVE' : isEnded ? 'Completed' : 'Scheduled'}
+                    <span class="status-badge ${isLive ? 'status-live' : (isCompleted || isEnded) ? 'status-completed' : 'status-scheduled'}" style="${isCompleted || isEnded ? 'background: #d1fae5; color: #059669;' : ''}">
+                        ${isLive ? '🔴 LIVE' : isEnded ? 'Ended' : isCompleted ? 'Completed' : 'Scheduled'}
                     </span>
                 </div>
                 <div class="class-time">
@@ -496,10 +541,17 @@ function renderTodayClasses(classes) {
                         <button class="btn-notify-sm" onclick="openAttendanceModal('${existingSession._id}')" title="Attendance">
                             <i class="fas fa-user-check"></i>
                         </button>
+                        <button class="btn-notify-sm" onclick="openNotificationModal('${existingSession._id}')" title="Send Notification">
+                            <i class="fas fa-bell"></i>
+                        </button>
                         <button class="btn-notify-sm" onclick="endLiveSession('${existingSession._id}')" title="End Session" style="color: #dc2626;">
                             <i class="fas fa-stop"></i>
                         </button>
-                    ` : hasLiveSession && !isEnded ? `
+                    ` : isEnded ? `
+                        <button class="btn-action btn-join-live" disabled style="opacity: 0.6; cursor: not-allowed; background: #94a3b8; border-color: #94a3b8;">
+                            <i class="fas fa-video"></i> Join
+                        </button>
+                    ` : hasLiveSession && !isCompleted ? `
                         <button class="btn-action btn-join-live" onclick="joinSession('${existingSession._id}')">
                             <i class="fas fa-play"></i> Start
                         </button>
@@ -557,7 +609,7 @@ async function startLiveSession(classIndex) {
 
         if (result.success) {
             showToast('Live session started successfully!', 'success');
-            
+
             const session = result.data;
 
             // Mark session as live immediately so students can join
@@ -579,7 +631,7 @@ async function startLiveSession(classIndex) {
             const classCard = document.querySelector(`.class-card[data-index="${classIndex}"]`);
             if (classCard) {
                 classCard.classList.add('active-session');
-                
+
                 const statusBadge = classCard.querySelector('.status-badge');
                 if (statusBadge) {
                     statusBadge.className = 'status-badge status-live';
@@ -627,7 +679,7 @@ async function startLiveSession(classIndex) {
 async function joinSession(sessionId) {
     try {
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch(`/api/live-session/${sessionId}/join`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -637,7 +689,7 @@ async function joinSession(sessionId) {
         if (result.success) {
             // Open the meeting link in a new window
             window.open(result.data.meetingLink, '_blank', 'width=1200,height=800');
-            
+
             // If session was scheduled, update it to live
             if (result.data.status === 'scheduled') {
                 await fetch(`/api/live-session/${sessionId}/start`, {
@@ -664,7 +716,7 @@ async function endLiveSession(sessionId) {
 
     try {
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch(`/api/live-session/${sessionId}/end`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -701,7 +753,7 @@ function copyMeetingLink(link) {
 async function sendSessionNotification(sessionId) {
     try {
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch(`/api/live-session/${sessionId}/notify`, {
             method: 'POST',
             headers: {
@@ -750,7 +802,7 @@ function closeAttendanceModal() {
 async function loadSessionAttendance(sessionId) {
     try {
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch(`/api/live-session/${sessionId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -759,13 +811,13 @@ async function loadSessionAttendance(sessionId) {
 
         if (result.success) {
             const session = result.data;
-            
+
             // Get students from the class
             const studentsResponse = await fetch(`/api/teachers/assigned-classes/${session.classId._id}/students`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const studentsResult = await studentsResponse.json();
-            
+
             renderAttendanceModal(session, studentsResult.data || []);
         } else {
             showToast(result.message || 'Failed to load session', 'error');
@@ -928,7 +980,7 @@ async function fetchLiveSessions() {
 
     try {
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch('/api/live-session/today', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -954,18 +1006,26 @@ function renderLiveSessionsList(sessions) {
     if (!container) return;
 
     const html = sessions.map(session => {
-        const isLive = session.status === 'live';
-        const isScheduled = session.status === 'scheduled';
+        const now = new Date();
+        const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+        const [endH, endM] = session.endTime.split(':').map(Number);
+        const endTotalMinutes = endH * 60 + endM;
+        const isPastEndTime = currentTotalMinutes > endTotalMinutes;
+
+        const isLive = session.status === 'live' && !isPastEndTime;
+        const isScheduled = session.status === 'scheduled' && !isPastEndTime;
+        const isCompleted = session.status === 'completed' || isPastEndTime;
         const isEnded = session.status === 'ended';
+
         const dateStr = new Date(session.scheduledDate).toLocaleDateString();
 
         return `
             <div class="session-list-item">
                 <div class="session-info">
-                    <div class="session-title">${escapeHtml(session.subjectName)} - ${escapeHtml(session.className)}</div>
+                    <div class="session-title">${escapeHtml(session.subjectName)} - ${escapeHtml(session.classId?.class || session.className)}</div>
                     <div class="session-meta">
-                        <span class="status-badge ${isLive ? 'status-live' : isScheduled ? 'status-scheduled' : 'status-ended'}">
-                            ${isLive ? '🔴 LIVE' : isScheduled ? 'Scheduled' : 'Ended'}
+                        <span class="status-badge ${isLive ? 'status-live' : isScheduled ? 'status-scheduled' : 'status-completed'}">
+                            ${isLive ? '🔴 LIVE' : isScheduled ? 'Scheduled' : isEnded ? 'Ended' : 'Completed'}
                         </span>
                         <span style="margin-left: 10px;">
                             <i class="fas fa-calendar"></i> ${dateStr} 
@@ -991,6 +1051,10 @@ function renderLiveSessionsList(sessions) {
                         <button class="btn-sm btn-copy-link" onclick="copyMeetingLink('${session.meetingLink}')" title="Copy Link">
                             <i class="fas fa-copy"></i>
                         </button>
+                    ` : isEnded ? `
+                        <button class="btn-sm btn-join-live" disabled style="opacity: 0.6; cursor: not-allowed; background: #94a3b8; border-color: #94a3b8;">
+                            <i class="fas fa-sign-in-alt"></i> Join
+                        </button>
                     ` : `
                         <!-- No actions for ended sessions -->
                     `}
@@ -1011,14 +1075,14 @@ async function refreshLiveSessions() {
         const icon = btn.querySelector('i');
         icon.classList.add('fa-spin');
     }
-    
+
     await initializeManageLiveClass();
-    
+
     if (btn) {
         const icon = btn.querySelector('i');
         icon.classList.remove('fa-spin');
     }
-    
+
     showToast('Sessions refreshed', 'success');
 }
 
@@ -1028,15 +1092,15 @@ async function refreshLiveSessions() {
 function joinLiveClass() {
     const meetingInput = document.getElementById('join-meeting-input');
     const passwordInput = document.getElementById('join-password-input');
-    
+
     if (!meetingInput || !meetingInput.value.trim()) {
         showToast('Please enter a meeting ID or link', 'error');
         return;
     }
-    
+
     const input = meetingInput.value.trim();
     let meetingLink = input;
-    
+
     // If input looks like a meeting ID, construct Zoom URL
     if (/^\d+$/.test(input)) {
         meetingLink = `https://zoom.us/j/${input}`;
@@ -1044,20 +1108,24 @@ function joinLiveClass() {
             meetingLink += `?pwd=${passwordInput.value.trim()}`;
         }
     }
-    
+
     window.open(meetingLink, '_blank', 'width=1200,height=800');
 }
 
 /**
  * Fetch active sessions for join page
  */
-async function fetchActiveSessionsForJoin() {
+async function fetchActiveSessionsForJoin(isSilent = false) {
     const container = document.getElementById('active-sessions-container');
     if (!container) return;
 
+    if (!isSilent) {
+        container.innerHTML = Components.LoadingState('Loading active sessions...');
+    }
+
     try {
         const token = localStorage.getItem('token');
-        
+
         const response = await fetch('/api/live-session/my-sessions?status=live,scheduled&limit=10', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1065,8 +1133,16 @@ async function fetchActiveSessionsForJoin() {
         const result = await response.json();
 
         if (result.success && result.data && result.data.length > 0) {
-            const activeSessions = result.data.filter(s => s.status === 'live' || s.status === 'scheduled');
-            
+            const activeSessions = result.data.filter(s => {
+                const now = new Date();
+                const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+                const [endH, endM] = s.endTime.split(':').map(Number);
+                const endTotalMinutes = endH * 60 + endM;
+                const isPastEndTime = currentTotalMinutes > endTotalMinutes;
+                return (s.status === 'live' || s.status === 'scheduled') && !isPastEndTime;
+            });
+
+
             if (activeSessions.length === 0) {
                 container.innerHTML = Components.EmptyState('broadcast-tower', 'No Active Sessions', 'There are no active or scheduled live sessions right now.');
                 return;
@@ -1127,7 +1203,7 @@ function showToast(message, type = 'info') {
             <span>${escapeHtml(message)}</span>
         </div>
     `;
-    
+
     toast.style.cssText = `
         position: fixed;
         top: 20px;

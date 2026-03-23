@@ -23,45 +23,19 @@ exports.getStudentsWithPayments = async (req, res) => {
     const studentsWithClassInfo = [];
     for (const student of students) {
       if (student.class) {
-        // Try to match student class with available classes
         let classSubject = null;
+        const classStr = student.class.toString();
         
-        // Handle different naming conventions
-        if (student.class === '10th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 10' });
-        } else if (student.class === '11th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 11' });
-        } else if (student.class === '12th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 12' });
-        } else if (student.class === '9th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 9' });
-        } else if (student.class === '8th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 8' });
-        } else if (student.class === '7th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 7' });
-        } else if (student.class === '6th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 6' });
-        } else if (student.class === '5th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 5' });
-        } else if (student.class === '4th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 4' });
-        } else if (student.class === '3rd' || student.class === '3th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 3' });
-        } else if (student.class === '2nd' || student.class === '2th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 2' });
-        } else if (student.class === '1st' || student.class === '1th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 1' });
-        } else {
-          // Try direct match first
-          classSubject = await ClassSubject.findOne({ name: student.class });
-          
-          // If not found, try to extract class number
-          if (!classSubject) {
-            const classMatch = student.class.match(/\d+/);
-            if (classMatch) {
-              const classNum = classMatch[0];
-              classSubject = await ClassSubject.findOne({ name: `Class ${classNum}` });
-            }
+        classSubject = await ClassSubject.findOne({ class: classStr });
+        
+        if (!classSubject) {
+          classSubject = await ClassSubject.findOne({ name: classStr });
+        }
+        
+        if (!classSubject) {
+          const classMatch = classStr.match(/\d+/);
+          if (classMatch) {
+            classSubject = await ClassSubject.findOne({ name: `Class ${classMatch[0]}` });
           }
         }
         
@@ -119,7 +93,7 @@ exports.getStudentsWithPayments = async (req, res) => {
       result.push({
         student_id: student._id,
         student_name: student.name,
-        class_name: student.classInfo.name,
+        class: student.classInfo.class,
         total_fees: totalFees,
         paid_amount: paidAmount,
         status: paymentStatus,
@@ -208,45 +182,19 @@ async function getStudentsWithPaymentsData() {
   const studentsWithClassInfo = [];
   for (const student of students) {
     if (student.class) {
-      // Try to match student class with available classes
       let classSubject = null;
+      const classStr = student.class.toString();
       
-      // Handle different naming conventions
-      if (student.class === '10th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 10' });
-      } else if (student.class === '11th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 11' });
-      } else if (student.class === '12th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 12' });
-      } else if (student.class === '9th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 9' });
-      } else if (student.class === '8th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 8' });
-      } else if (student.class === '7th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 7' });
-      } else if (student.class === '6th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 6' });
-      } else if (student.class === '5th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 5' });
-      } else if (student.class === '4th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 4' });
-      } else if (student.class === '3rd' || student.class === '3th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 3' });
-      } else if (student.class === '2nd' || student.class === '2th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 2' });
-      } else if (student.class === '1st' || student.class === '1th') {
-        classSubject = await ClassSubject.findOne({ name: 'Class 1' });
-      } else {
-        // Try direct match first
-        classSubject = await ClassSubject.findOne({ name: student.class });
-        
-        // If not found, try to extract class number
-        if (!classSubject) {
-          const classMatch = student.class.match(/\d+/);
-          if (classMatch) {
-            const classNum = classMatch[0];
-            classSubject = await ClassSubject.findOne({ name: `Class ${classNum}` });
-          }
+      classSubject = await ClassSubject.findOne({ class: classStr });
+      
+      if (!classSubject) {
+        classSubject = await ClassSubject.findOne({ name: classStr });
+      }
+      
+      if (!classSubject) {
+        const classMatch = classStr.match(/\d+/);
+        if (classMatch) {
+          classSubject = await ClassSubject.findOne({ name: `Class ${classMatch[0]}` });
         }
       }
       
@@ -373,14 +321,19 @@ exports.updateStudentPayment = async (req, res) => {
     
     // Find class info
     let classSubject = null;
-    if (student.class === '10th') {
-      classSubject = await ClassSubject.findOne({ name: 'Class 10' });
-    } else if (student.class === '11th') {
-      classSubject = await ClassSubject.findOne({ name: 'Class 11' });
-    } else if (student.class === '12th') {
-      classSubject = await ClassSubject.findOne({ name: 'Class 12' });
-    } else {
-      classSubject = await ClassSubject.findOne({ name: student.class });
+    const classStr = student.class ? student.class.toString() : '';
+    
+    if (classStr) {
+      classSubject = await ClassSubject.findOne({ class: classStr });
+      if (!classSubject) {
+        classSubject = await ClassSubject.findOne({ name: classStr });
+      }
+      if (!classSubject) {
+        const classMatch = classStr.match(/\d+/);
+        if (classMatch) {
+          classSubject = await ClassSubject.findOne({ name: `Class ${classMatch[0]}` });
+        }
+      }
     }
     
     if (!classSubject) {
@@ -467,45 +420,17 @@ exports.getAllStudentPayments = async (req, res) => {
     const studentsWithClassInfo = [];
     for (const student of students) {
       if (student.class) {
-        // Try to match student class with available classes
         let classSubject = null;
+        const classStr = student.class.toString();
         
-        // Handle different naming conventions
-        if (student.class === '10th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 10' });
-        } else if (student.class === '11th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 11' });
-        } else if (student.class === '12th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 12' });
-        } else if (student.class === '9th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 9' });
-        } else if (student.class === '8th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 8' });
-        } else if (student.class === '7th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 7' });
-        } else if (student.class === '6th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 6' });
-        } else if (student.class === '5th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 5' });
-        } else if (student.class === '4th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 4' });
-        } else if (student.class === '3rd' || student.class === '3th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 3' });
-        } else if (student.class === '2nd' || student.class === '2th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 2' });
-        } else if (student.class === '1st' || student.class === '1th') {
-          classSubject = await ClassSubject.findOne({ name: 'Class 1' });
-        } else {
-          // Try direct match first
-          classSubject = await ClassSubject.findOne({ name: student.class });
-          
-          // If not found, try to extract class number
-          if (!classSubject) {
-            const classMatch = student.class.match(/\d+/);
-            if (classMatch) {
-              const classNum = classMatch[0];
-              classSubject = await ClassSubject.findOne({ name: `Class ${classNum}` });
-            }
+        classSubject = await ClassSubject.findOne({ class: classStr });
+        if (!classSubject) {
+          classSubject = await ClassSubject.findOne({ name: classStr });
+        }
+        if (!classSubject) {
+          const classMatch = classStr.match(/\d+/);
+          if (classMatch) {
+            classSubject = await ClassSubject.findOne({ name: `Class ${classMatch[0]}` });
           }
         }
         
@@ -538,7 +463,7 @@ exports.getAllStudentPayments = async (req, res) => {
     
     const payments = await StudentPayment.find(paymentsQuery)
       .populate('studentId', 'name email')
-      .populate('classId', 'name class')
+      .populate('classId', 'class')
       .sort({ 'classId.class': 1, 'studentId.name': 1 });
     
     // Create payment records for students who don't have payments yet
@@ -564,8 +489,7 @@ exports.getAllStudentPayments = async (req, res) => {
         _id: payment._id,
         studentName: student.name,
         studentEmail: student.email,
-        class: student.classInfo?.name || student.class || 'N/A',
-        class: student.classInfo?.class || 'N/A',
+        class: student.classInfo?.class || student.class || 'N/A',
         totalFees: payment.totalFees,
         paidAmount: payment.paidAmount,
         dueAmount: payment.dueAmount,
@@ -607,7 +531,7 @@ exports.updatePayment = async (req, res) => {
     
     const payment = await StudentPayment.findById(paymentId)
       .populate('studentId', 'name')
-      .populate('classId', 'name class');
+      .populate('classId', 'class');
     
     if (!payment) {
       return res.status(404).json({ success: false, message: "Payment record not found" });
@@ -649,7 +573,7 @@ exports.generateReceipt = async (req, res) => {
     
     const payment = await StudentPayment.findById(paymentId)
       .populate('studentId', 'name email')
-      .populate('classId', 'name class');
+      .populate('classId', 'class');
     
     if (!payment) {
       return res.status(404).json({ success: false, message: "Payment record not found" });
@@ -698,7 +622,7 @@ exports.generateBulkReceipts = async (req, res) => {
       paymentHistory: { $exists: true, $ne: [] }
     })
       .populate('studentId', 'name email')
-      .populate('classId', 'name class');
+      .populate('classId', 'class');
     
     const receipts = payments.map(payment => {
       const latestPayment = payment.paymentHistory[payment.paymentHistory.length - 1];
@@ -706,7 +630,7 @@ exports.generateBulkReceipts = async (req, res) => {
         schoolName: "Smart School System",
         studentName: payment.studentId.name,
         studentEmail: payment.studentId.email,
-        className: payment.classId.name,
+        className: `Class ${payment.classId.class}`,
         class: payment.classId.class,
         totalFees: payment.totalFees,
         paidAmount: latestPayment.amount,

@@ -35,6 +35,8 @@ exports.submitApplication = async (req, res) => {
       termsAccepted
     } = req.body;
 
+    const numericClass = studentClass ? parseInt(studentClass.toString().replace(/[^0-9]/g, '')) : undefined;
+
     // Check for duplicate parent email
     const existingApplication = await Admission.findOne({ email: email.toLowerCase() });
     if (existingApplication) {
@@ -61,7 +63,7 @@ exports.submitApplication = async (req, res) => {
       studentName: fullName,
       dob: new Date(dob),
       gender,
-      class: studentClass,
+      class: numericClass,
       studentEmail,
       contactNumber,
       parentName,
@@ -206,15 +208,15 @@ exports.getApplicationById = async (req, res) => {
  */
 async function generateRollNumber(className) {
   try {
-    // Find the highest roll number in this class
+    // Find the highest roll number in this class using the new schema
     const lastStudent = await User.findOne({ 
-      role: 'student', 
-      class: className,
-      rollNo: { $exists: true, $ne: null }
-    }).sort({ rollNo: -1 }).lean();
+      role: 'student',
+      'studentData.class': className,
+      'studentData.rollNo': { $exists: true, $ne: null }
+    }).sort({ 'studentData.rollNo': -1 }).lean();
     
     // Return next roll number (start from 1 if no students exist)
-    return lastStudent && lastStudent.rollNo ? lastStudent.rollNo + 1 : 1;
+    return lastStudent && lastStudent.studentData?.rollNo ? lastStudent.studentData.rollNo + 1 : 1;
   } catch (error) {
     console.error('Error generating roll number:', error);
     return 1;
@@ -253,8 +255,15 @@ exports.approveApplication = async (req, res) => {
     let userExisted = false;
 
     if (!user) {
+      // Sanitize class to numeric format only
+      const numericClass = application.class ? parseInt(application.class.toString().replace(/[^0-9]/g, '')) : undefined;
+      
+      if (!numericClass) {
+        return res.status(400).json({ success: false, message: 'Invalid class format for student' });
+      }
+
       // Generate roll number for the class
-      const rollNo = await generateRollNumber(application.class);
+      const rollNo = await generateRollNumber(numericClass);
       
       // Create student account
       const randomPassword = generateRandomPassword(8);
@@ -267,26 +276,28 @@ exports.approveApplication = async (req, res) => {
         email: studentEmail.toLowerCase(),
         password: hashedPassword,
         role: 'student',
-        class: application.class,
-        rollNo: rollNo,
-        dob: application.dob,
-        gender: application.gender,
-        mobileNumber: application.contactNumber || '',
-        // Parent information
-        parentName: application.parentName || '',
-        parentRelationship: application.relationship || '',
-        parentPhone: application.phone || '',
-        parentEmail: parentEmail || '',
-        // Address information
-        streetAddress: application.streetAddress || '',
-        city: application.city || '',
-        state: application.state || '',
-        zipCode: application.zipCode || '',
-        country: application.country || '',
+        profileImage: application.studentPhoto,
+        mobileNumber: application.contactNumber,
         timezone: application.timezone || 'Asia/Kolkata',
-        // Link to admission record
-        admissionId: application._id,
-        profileImage: application.studentPhoto || ''
+        // Student-specific data
+        studentData: {
+          class: numericClass,
+          rollNo: rollNo,
+          dob: application.dob,
+          gender: application.gender,
+          parentDetails: {
+            name: application.parentName,
+            relationship: application.relationship,
+            phone: application.phone,
+            email: parentEmail
+          },
+          streetAddress: application.streetAddress,
+          city: application.city,
+          state: application.state,
+          zipCode: application.zipCode,
+          country: application.country,
+          admissionId: application._id
+        }
       });
 
       console.log(`Created student ${user.name} with roll number ${rollNo} in class ${application.class}`);
@@ -318,18 +329,41 @@ exports.approveApplication = async (req, res) => {
       console.log('User already exists, linking to application');
       
       // Update existing user with admission data if missing
-      const updates = {};
-      if (!user.class && application.class) updates.class = application.class;
-      if (!user.rollNo) updates.rollNo = await generateRollNumber(application.class);
-      if (!user.dob && application.dob) updates.dob = application.dob;
-      if (!user.gender && application.gender) updates.gender = application.gender;
-      if (!user.parentName && application.parentName) updates.parentName = application.parentName;
-      if (!user.parentRelationship && application.relationship) updates.parentRelationship = application.relationship;
-      if (!user.parentPhone && application.phone) updates.parentPhone = application.phone;
-      if (!user.parentEmail && parentEmail) updates.parentEmail = parentEmail;
-      if (!user.admissionId) updates.admissionId = application._id;
+      const updates = {
+        $set: { role: 'student' }
+      };
       
-      if (Object.keys(updates).length > 0) {
+      const numericClass = application.class ? parseInt(application.class.toString().replace(/[^0-9]/g, '')) : undefined;
+
+      if (!user.studentData?.class && numericClass) {
+        updates.$set['studentData.class'] = numericClass;
+      }
+      if (!user.studentData?.rollNo) {
+        updates.$set['studentData.rollNo'] = await generateRollNumber(numericClass || user.studentData?.class);
+      }
+      if (!user.studentData?.dob && application.dob) {
+        updates.$set['studentData.dob'] = application.dob;
+      }
+      if (!user.studentData?.gender && application.gender) {
+        updates.$set['studentData.gender'] = application.gender;
+      }
+      if (!user.studentData?.parentDetails?.name && application.parentName) {
+        updates.$set['studentData.parentDetails.name'] = application.parentName;
+      }
+      if (!user.studentData?.parentDetails?.relationship && application.relationship) {
+        updates.$set['studentData.parentDetails.relationship'] = application.relationship;
+      }
+      if (!user.studentData?.parentDetails?.phone && application.phone) {
+        updates.$set['studentData.parentDetails.phone'] = application.phone;
+      }
+      if (!user.studentData?.parentDetails?.email && parentEmail) {
+        updates.$set['studentData.parentDetails.email'] = parentEmail;
+      }
+      if (!user.studentData?.admissionId) {
+        updates.$set['studentData.admissionId'] = application._id;
+      }
+      
+      if (Object.keys(updates.$set).length > 1) { // More than just role
         await User.findByIdAndUpdate(user._id, updates);
         console.log('Updated existing user with admission data');
       }

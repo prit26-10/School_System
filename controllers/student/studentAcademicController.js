@@ -12,7 +12,7 @@ exports.getStudentTimetable = async (req, res) => {
     try {
         // Fetch full user data from database to get class information
         const user = await User.findById(req.user.id).lean();
-        const studentClass = user?.class_id || user?.class;
+        const studentClass = user?.class_id || user?.class || user?.studentData?.class;
 
         if (!studentClass) {
             return res.status(400).json({

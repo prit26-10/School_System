@@ -11,7 +11,7 @@ function normalizeClassValue(classValue) {
 exports.getMyAssignments = async (req, res) => {
     try {
         const student = await User.findById(req.user.id).lean();
-        const studentClass = student?.class_id || student?.class;
+        const studentClass = student?.class_id || student?.class || student?.studentData?.class;
 
         if (!studentClass) {
             return res.status(400).json({

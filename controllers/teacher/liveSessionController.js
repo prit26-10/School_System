@@ -1,7 +1,55 @@
 const LiveSession = require("../../models/LiveSession");
 const ClassSubject = require("../../models/ClassSubject");
 const User = require("../../models/User");
-const { createZoomMeeting } = require("../../utils/meetingService");
+const { createZoomMeeting, checkZoomMeetingStatus, deleteZoomMeeting } = require("../../utils/meetingService");
+const crypto = require("crypto");
+
+/**
+ * Handle Zoom Webhook events
+ * POST /api/live-session/webhook
+ */
+exports.zoomWebhook = async (req, res) => {
+    try {
+        const { event, payload } = req.body;
+        const ZOOM_WEBHOOK_SECRET_TOKEN = process.env.ZOOM_WEBHOOK_SECRET_TOKEN || "";
+
+        // 1. Zoom Endpoint URL Validation
+        if (event === "endpoint.url_validation") {
+            const hashForValidate = crypto.createHmac('sha256', ZOOM_WEBHOOK_SECRET_TOKEN)
+                .update(payload.plainToken)
+                .digest('hex');
+
+            return res.status(200).json({
+                plainToken: payload.plainToken,
+                encryptedToken: hashForValidate
+            });
+        }
+
+        // 2. Handle Meeting Ended Event
+        if (event === "meeting.ended") {
+            const meetingId = payload?.object?.id?.toString();
+            
+            if (meetingId) {
+                const session = await LiveSession.findOne({ meetingId, status: { $in: ["live", "scheduled"] } });
+                
+                if (session) {
+                    session.status = "ended";
+                    session.isActive = false;
+                    if (!session.endedAt) session.endedAt = new Date();
+                    await session.save();
+                    console.log(`[Zoom Webhook] Session ${session._id} marked as ended.`);
+                }
+            }
+        }
+
+        // Acknowledge receipt
+        res.status(200).send();
+    } catch (error) {
+        console.error("Error processing zoom webhook:", error);
+        res.status(500).send();
+    }
+};
+
 
 function normalizeClassValue(classValue) {
     if (!classValue) return "";
@@ -135,7 +183,7 @@ exports.createLiveSession = async (req, res) => {
         // Populate response data
         const responseData = await LiveSession.findById(liveSession._id)
             .populate("teacherId", "name email")
-            .populate("classId", "name class");
+            .populate("classId", "class");
 
         res.status(201).json({
             success: true,
@@ -179,24 +227,26 @@ exports.getTodaySessions = async (req, res) => {
         };
 
         if (userRole === "student") {
-            const student = await User.findById(userId);
-            if (student && student.class) {
+            const student = await User.findById(userId).lean();
+            const studentClass = student ? (student.class || student.studentData?.class) : null;
+
+            if (studentClass) {
                 // Find ClassSubject document to get classId for robust matching
                 const classDocs = await ClassSubject.find({}).lean();
-                let classDoc = classDocs.find(d => d.name === student.class || d.class === student.class);
+                let classDoc = classDocs.find(d => String(d.class) === String(studentClass));
 
                 if (!classDoc) {
-                    const normalizedStudentClass = normalizeClassValue(student.class);
+                    const normalizedStudentClass = normalizeClassValue(studentClass);
                     classDoc = classDocs.find(d => normalizeClassValue(d.class) === normalizedStudentClass);
                 }
 
                 if (classDoc) {
                     query.classId = classDoc._id; // Match by strict Class ID!
                 } else {
-                    const escapedClassName = student.class.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const escapedClassName = String(studentClass).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     query.className = new RegExp(escapedClassName, "i");
                 }
-                query.status = { $in: ["scheduled", "live", "ended"] };
+                query.status = { $in: ["scheduled", "live", "completed"] };
             } else {
                 return res.status(200).json({ success: true, data: [] });
             }
@@ -206,13 +256,64 @@ exports.getTodaySessions = async (req, res) => {
         }
 
         const sessions = await LiveSession.find(query)
-            .populate("classId", "name class")
+            .populate("classId", "class")
             .sort({ startTime: 1 });
+
+        // Lazy status update: check if session has expired or ended in Zoom
+        const now = new Date();
+        const updatedSessions = await Promise.all(sessions.map(async (session) => {
+            let updated = false;
+
+            // 1. Check if past end time
+            const sessionEndDateTime = new Date(session.scheduledDate);
+            const [endHour, endMin] = session.endTime.split(':').map(Number);
+            sessionEndDateTime.setHours(endHour || 0, endMin || 0, 0, 0);
+
+            if (now > sessionEndDateTime && session.status !== "ended" && session.status !== "completed" && session.status !== "cancelled") {
+                session.status = "ended";
+                session.isActive = false;
+                if (!session.endedAt) session.endedAt = now;
+                updated = true;
+                if (session.meetingId) {
+                    await deleteZoomMeeting(session.meetingId);
+                }
+            } 
+            // 2. Check Zoom status for active sessions
+            else if ((session.status === "live" || session.status === "scheduled") && session.meetingId) {
+                const zoomStatus = await checkZoomMeetingStatus(session.meetingId);
+                // If Zoom meeting has ended, mark as ended
+                if (zoomStatus.success) {
+                    // Update flag if Zoom meeting was seen active
+                    if (zoomStatus.status === "started" && !session.isZoomStarted) {
+                        session.isZoomStarted = true;
+                        updated = true;
+                    }
+
+                    const hasEnded = zoomStatus.status === "ended" || 
+                                     zoomStatus.status === "completed" ||
+                                     (session.isZoomStarted && zoomStatus.status === "waiting");
+
+                    if (hasEnded) {
+                        session.status = "ended";
+                        session.isActive = false;
+                        if (!session.endedAt) session.endedAt = now;
+                        updated = true;
+                        await deleteZoomMeeting(session.meetingId);
+                    }
+                }
+            }
+
+            if (updated) {
+                await session.save();
+            }
+            return session;
+        }));
 
         res.status(200).json({
             success: true,
-            data: sessions
+            data: updatedSessions
         });
+
     } catch (error) {
         console.error("Error fetching today's sessions:", error);
         res.status(500).json({
@@ -244,14 +345,54 @@ exports.getMySessions = async (req, res) => {
         }
 
         const sessions = await LiveSession.find(query)
-            .populate("classId", "name class")
+            .populate("classId", "class")
             .sort({ scheduledDate: -1, startTime: 1 })
             .limit(parseInt(limit));
 
+        const now = new Date();
+        const updatedSessions = await Promise.all(sessions.map(async (session) => {
+            let updated = false;
+
+            const sessionEndDateTime = new Date(session.scheduledDate);
+            const [endHour, endMin] = session.endTime.split(':').map(Number);
+            sessionEndDateTime.setHours(endHour || 0, endMin || 0, 0, 0);
+
+            if (now > sessionEndDateTime && session.status !== "ended" && session.status !== "completed" && session.status !== "cancelled") {
+                session.status = "ended";
+                session.isActive = false;
+                if (!session.endedAt) session.endedAt = now;
+                updated = true;
+                if (session.meetingId) {
+                    await deleteZoomMeeting(session.meetingId);
+                }
+            } else if ((session.status === "live" || session.status === "scheduled") && session.meetingId) {
+                const zoomStatus = await checkZoomMeetingStatus(session.meetingId);
+                if (zoomStatus.success) {
+                    if (zoomStatus.status === "started" && !session.isZoomStarted) {
+                        session.isZoomStarted = true;
+                        updated = true;
+                    }
+                    const hasEnded = zoomStatus.status === "ended" || zoomStatus.status === "completed" || (session.isZoomStarted && zoomStatus.status === "waiting");
+                    if (hasEnded) {
+                        session.status = "ended";
+                        session.isActive = false;
+                        if (!session.endedAt) session.endedAt = now;
+                        updated = true;
+                        await deleteZoomMeeting(session.meetingId);
+                    }
+                }
+            }
+
+            if (updated) {
+                await session.save();
+            }
+            return session;
+        }));
+
         res.status(200).json({
             success: true,
-            count: sessions.length,
-            data: sessions
+            count: updatedSessions.length,
+            data: updatedSessions
         });
     } catch (error) {
         console.error("Error fetching my sessions:", error);
@@ -290,10 +431,10 @@ exports.startSession = async (req, res) => {
             });
         }
 
-        if (session.status === "ended") {
+        if (session.status === "completed") {
             return res.status(400).json({
                 success: false,
-                message: "Session has already ended"
+                message: "Session has already completed"
             });
         }
 
@@ -301,6 +442,20 @@ exports.startSession = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Session has been cancelled"
+            });
+        }
+        const sessionEndDateTime = new Date(session.scheduledDate);
+        const [endHour, endMin] = session.endTime.split(':').map(Number);
+        sessionEndDateTime.setHours(endHour || 0, endMin || 0, 0, 0);
+
+        if (new Date() > sessionEndDateTime) {
+            session.status = "completed";
+            session.isActive = false;
+            if (!session.endedAt) session.endedAt = new Date();
+            await session.save();
+            return res.status(400).json({
+                success: false,
+                message: "Cannot start session because the end time has passed."
             });
         }
 
@@ -350,16 +505,21 @@ exports.endSession = async (req, res) => {
             });
         }
 
-        if (session.status === "ended") {
+        if (session.status === "completed") {
             return res.status(400).json({
                 success: false,
-                message: "Session already ended"
+                message: "Session already completed"
             });
         }
 
         session.status = "ended";
+        session.isActive = false;
         session.endedAt = new Date();
         await session.save();
+
+        if (session.meetingId) {
+            await deleteZoomMeeting(session.meetingId);
+        }
 
         res.status(200).json({
             success: true,
@@ -393,13 +553,41 @@ exports.joinSession = async (req, res) => {
         }
 
         const session = await LiveSession.findById(sessionId)
-            .populate("classId", "name class")
+            .populate("classId", "class")
             .populate("teacherId", "name email");
 
         if (!session) {
             return res.status(404).json({
                 success: false,
                 message: "Session not found"
+            });
+        }
+
+        const sessionEndDateTime = new Date(session.scheduledDate);
+        const [endHour, endMin] = session.endTime.split(':').map(Number);
+        sessionEndDateTime.setHours(endHour || 0, endMin || 0, 0, 0);
+
+        const now = new Date();
+        if (now > sessionEndDateTime) {
+            session.status = "completed";
+            session.isActive = false;
+            if (!session.endedAt) session.endedAt = now;
+            await session.save();
+            
+            if (session.meetingId) {
+                await deleteZoomMeeting(session.meetingId);
+            }
+
+            return res.status(400).json({
+                success: false,
+                message: "Cannot join session because the end time has passed."
+            });
+        }
+        
+        if (session.status === "ended" || session.status === "completed") {
+            return res.status(400).json({
+                success: false,
+                message: "This live session has already ended and cannot be joined."
             });
         }
 
@@ -413,10 +601,10 @@ exports.joinSession = async (req, res) => {
             }
         } else if (userRole === "student") {
             // Students can only join if session is live or scheduled
-            if (session.status !== "live" && session.status !== "scheduled") {
+            if (session.status !== "live") {
                 return res.status(400).json({
                     success: false,
-                    message: "Session is not available to join"
+                    message: "Session is not live. Please wait for the teacher to start the session."
                 });
             }
 
@@ -561,7 +749,7 @@ exports.sendNotification = async (req, res) => {
         const classValue = session.classId.class;
         const students = await User.find({
             role: "student",
-            class: new RegExp(classValue, "i")
+            "studentData.class": Number(classValue)
         });
 
         // Here you would integrate with your notification service
@@ -613,7 +801,7 @@ exports.getSessionDetails = async (req, res) => {
 
         const session = await LiveSession.findOne(query)
             .populate("teacherId", "name email")
-            .populate("classId", "name class")
+            .populate("classId", "class")
             .populate("attendance.studentId", "name email rollNo");
 
         if (!session) {

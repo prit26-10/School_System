@@ -1662,7 +1662,7 @@
     animation: pulse 2s infinite;
 }
 
-.status-ended {
+.status-ended, .status-completed {
     background: #f1f5f9;
     color: #94a3b8;
 }

@@ -38,6 +38,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Then fetch fresh profile from API to update name
     fetchStudentProfile();
+
+    // Start interval refresh
 });
 
 function setupLogout() {
@@ -215,6 +217,7 @@ function loadPageData(pageId) {
             loadDashboardStats();
             loadTodaySchedule();
             loadRecentAnnouncements();
+            startLiveSessionsPolling(); // Start polling for dashboard too
             break;
         case 'view-profile':
             loadProfileData();
@@ -242,7 +245,7 @@ function loadPageData(pageId) {
             break;
         case 'join-session':
             loadLiveSessions();
-            startLiveSessionsPolling();
+            startLiveSessionsPolling(); // Start polling
             break;
         case 'view-results':
             loadResults();
@@ -279,23 +282,94 @@ async function loadTodaySchedule() {
     const container = document.getElementById('today-schedule-container');
     if (!container) return;
 
-    // Placeholder data
-    const schedule = [
-        { time: '08:00 AM', subject: 'Mathematics', grade: 'Grade 10-A', type: 'Live' },
-        { time: '09:30 AM', subject: 'Physics', grade: 'Grade 10-A', type: 'Class' },
-        { time: '11:00 AM', subject: 'English', grade: 'Grade 10-A', type: 'Lab' }
-    ];
+    container.innerHTML = `<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
 
-    container.innerHTML = schedule.map(item => `
-        <div class="schedule-item" style="display: flex; align-items: center; gap: 16px; padding: 12px; background: #f8fafc; border-radius: 12px; margin-bottom: 8px;">
-            <div class="schedule-time" style="min-width: 80px; font-weight: 700; color: #3b82f6; font-size: 13px;">${item.time}</div>
-            <div class="schedule-info">
-                <div style="font-weight: 600; color: #1e293b; font-size: 14px;">${item.subject}</div>
-                <div style="color: #64748b; font-size: 12px;">${item.grade} • ${item.type}</div>
-            </div>
-            <button class="btn-join" style="margin-left: auto; padding: 4px 12px; border-radius: 20px; border: none; background: #3b82f6; color: white; font-size: 12px; cursor: pointer;">Join</button>
-        </div>
-    `).join('');
+    const token = localStorage.getItem('token');
+    try {
+        const [timetableRes, sessionsRes] = await Promise.all([
+            fetch('/api/students/me/timetable', { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch('/api/live-session/today', { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
+        if (timetableRes.status === 401 || sessionsRes.status === 401) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const timetableResult = await timetableRes.json();
+        const sessionsResult = await sessionsRes.json();
+
+        if (!timetableResult.success || !timetableResult.data || !timetableResult.data.timetable) {
+            container.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">No schedule found for today.</div>`;
+            return;
+        }
+
+        const timetableGrid = timetableResult.data.timetable;
+        const liveSessions = sessionsResult.success ? (sessionsResult.data || []) : [];
+
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const todayDay = days[new Date().getDay()];
+        const todayClasses = timetableGrid[todayDay] || [];
+
+        if (todayClasses.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">No classes scheduled for today (${todayDay}).</div>`;
+            return;
+        }
+
+        // Sort chronologically
+        todayClasses.sort((a, b) => {
+            const timeA = new Date(`1970/01/01 ${a.startTime}`).getTime();
+            const timeB = new Date(`1970/01/01 ${b.startTime}`).getTime();
+            return timeA - timeB;
+        });
+
+        const classNameDisplay = currentUser && currentUser.class ? `Class ${currentUser.class}` : 'Your Class';
+
+        container.innerHTML = todayClasses.map(cls => {
+            // Match with live session
+            const liveSession = liveSessions.find(s =>
+                s.subjectName?.trim().toLowerCase() === cls.subjectName?.trim().toLowerCase() &&
+                s.startTime?.trim() === cls.startTime?.trim()
+            );
+
+            const isLive = liveSession && liveSession.status === 'live';
+            const isCompleted = liveSession && liveSession.status === 'completed';
+
+            let statusText = 'Class';
+            let statusStyle = 'color: #64748b;';
+            if (isLive) {
+                statusText = '🔴 LIVE';
+                statusStyle = 'color: #ef4444; font-weight: 700;';
+            } else if (isCompleted) {
+                statusText = 'Completed';
+                statusStyle = 'color: #10b981;';
+            }
+
+            const numericClass = currentUser && currentUser.class ? currentUser.class : 'N/A';
+
+            return `
+                <div class="schedule-item" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                    <div style="display: flex; align-items: center; gap: 20px; flex: 1;">
+                        <div class="schedule-time" style="min-width: 85px; font-weight: 700; color: #2563eb; font-size: 14px;">${cls.startTime}</div>
+                        <div class="schedule-info">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 15px; margin-bottom: 2px;">${cls.subjectName}</div>
+                            <div style="color: #64748b; font-size: 12px; font-weight: 500;">Class: <span style="color: #334155; font-weight: 600;">${numericClass}</span></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <span style="${statusStyle} font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; background: ${isLive ? '#fee2e2' : isCompleted ? '#dcfce7' : '#f1f5f9'};">${statusText}</span>
+                        ${isLive ? `
+                            <button class="btn-join" onclick="studentJoinSession('${liveSession._id}')" style="padding: 6px 16px; border-radius: 20px; border: none; background: #ef4444; color: white; font-size: 12px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='scale(1.05)';" onmouseout="this.style.transform='none';">Join</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Error loading today schedule:', err);
+        if (container) container.innerHTML = `<div style="text-align: center; color: #ef4444; font-size: 12px;">Failed to load.</div>`;
+    }
 }
 
 // ────────────────────────────────────────────────
@@ -397,7 +471,7 @@ function renderAnnouncementsList(announcements, container) {
         `;
     }).join('');
 
-    container.innerHTML = `<div style="max-width: 800px; margin: 0 auto;">${cards}</div>`;
+    container.innerHTML = `<div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); width: 100%; margin: 0 auto; padding-bottom: 20px;">${cards}</div>`;
 }
 
 // ────────────────────────────────────────────────
@@ -861,13 +935,11 @@ function renderStudyMaterials(materials, className) {
 
         return `
             <div class="material-card" style="
-                background: white;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 20px;
-                margin-bottom: 16px;
-                transition: all 0.3s ease;
-                cursor: pointer;
+                padding: 16px;
+                border: 1px solid #f1f5f9;
+                border-radius: 12px;
+                background: #f8fafc;
+                transition: all 0.2s ease;
             ">
                 <div style="display: flex; align-items: flex-start; gap: 16px;">
                     <div style="
@@ -976,20 +1048,15 @@ function renderStudyMaterials(materials, className) {
         `;
     }).join('');
 
+    const numericClass = currentUser && currentUser.class ? currentUser.class : 'N/A';
+
     container.innerHTML = `
-        <div style="margin-bottom: 24px;">
-            <h2 style="margin: 0; color: #1e293b; font-size: 24px; font-weight: 700;">
-                Study Materials
-            </h2>
-            <p style="margin: 8px 0 0 0; color: #64748b;">
-                Materials for <strong>${className}</strong> • ${materials.length} item${materials.length !== 1 ? 's' : ''}
-            </p>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1200px; margin: 0 auto;">
+            <p style="margin: 0 0 20px 0; color: #64748b; font-size: 14px; font-weight: 500;">Showing <strong>${materials.length}</strong> material${materials.length !== 1 ? 's' : ''} for Class <strong>${numericClass}</strong></p>
+            <div class="materials-grid">
+                ${materialsHTML}
+            </div>
         </div>
-        
-        <div class="materials-grid">
-            ${materialsHTML}
-        </div>
-        
         <style>
             .material-card:hover {
                 transform: translateY(-2px);
@@ -1057,17 +1124,28 @@ function loadResults() {
 // Live Sessions
 // ────────────────────────────────────────────────
 
-function startLiveSessionsPolling() {
-    if (liveSessionsInterval) return;
-    liveSessionsInterval = setInterval(() => {
-        loadLiveSessions(true); // silent load
-    }, 5000);
-}
-
 function stopLiveSessionsPolling() {
     if (liveSessionsInterval) {
         clearInterval(liveSessionsInterval);
         liveSessionsInterval = null;
+    }
+}
+
+function startLiveSessionsPolling() {
+    if (!liveSessionsInterval) {
+        liveSessionsInterval = setInterval(() => {
+            // Check if we are still on dashboard or join-session page before loading
+            const dashboardActive = document.getElementById('page-dashboard')?.classList.contains('active');
+            const joinActive = document.getElementById('page-join-session')?.classList.contains('active');
+            
+            if (dashboardActive) {
+                loadTodaySchedule(); 
+            } else if (joinActive) {
+                loadLiveSessions(true);
+            } else {
+                stopLiveSessionsPolling();
+            }
+        }, 5000); // 5 seconds
     }
 }
 
@@ -1092,24 +1170,24 @@ function loadLiveSessions(isSilent = false) {
         fetch('/api/students/me/timetable', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/live-session/today', { headers: { 'Authorization': `Bearer ${token}` } })
     ])
-    .then(async ([timetableRes, sessionsRes]) => {
-        if (timetableRes.status === 401 || sessionsRes.status === 401 || 
-            timetableRes.status === 403 || sessionsRes.status === 403) {
-            window.location.href = '/login';
-            return Promise.reject('Unauthorized');
-        }
+        .then(async ([timetableRes, sessionsRes]) => {
+            if (timetableRes.status === 401 || sessionsRes.status === 401 ||
+                timetableRes.status === 403 || sessionsRes.status === 403) {
+                window.location.href = '/login';
+                return Promise.reject('Unauthorized');
+            }
 
-        const timetableResult = await timetableRes.json();
-        const sessionsResult = await sessionsRes.json();
+            const timetableResult = await timetableRes.json();
+            const sessionsResult = await sessionsRes.json();
 
-        const containerHeader = `
+            const containerHeader = `
             <h3 style="margin-bottom: 24px; color: #1e293b; font-size: 20px; display: flex; align-items: center; gap: 10px;">
                 <i class="fas fa-broadcast-tower" style="color: #0A66FF; font-size: 18px;"></i> Today's Live Sessions
             </h3>
         `;
 
-        if (!timetableResult.success || !timetableResult.data || !timetableResult.data.timetable) {
-            container.innerHTML = `
+            if (!timetableResult.success || !timetableResult.data || !timetableResult.data.timetable) {
+                container.innerHTML = `
                 <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
                     ${containerHeader}
                     <div style="text-align: center; padding: 40px; color: #94a3b8;">
@@ -1118,18 +1196,18 @@ function loadLiveSessions(isSilent = false) {
                     </div>
                 </div>
             `;
-            return;
-        }
+                return;
+            }
 
-        const timetableGrid = timetableResult.data.timetable;
-        const liveSessions = sessionsResult.success ? (sessionsResult.data || []) : [];
+            const timetableGrid = timetableResult.data.timetable;
+            const liveSessions = sessionsResult.success ? (sessionsResult.data || []) : [];
 
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const todayDay = days[new Date().getDay()];
-        const todayClasses = timetableGrid[todayDay] || [];
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const todayDay = days[new Date().getDay()];
+            const todayClasses = timetableGrid[todayDay] || [];
 
-        if (todayClasses.length === 0) {
-            container.innerHTML = `
+            if (todayClasses.length === 0) {
+                container.innerHTML = `
                 <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
                     ${containerHeader}
                     <div style="text-align: center; padding: 40px; color: #94a3b8;">
@@ -1138,43 +1216,50 @@ function loadLiveSessions(isSilent = false) {
                     </div>
                 </div>
             `;
-            return;
-        }
-
-        // Sort chronologically
-        todayClasses.sort((a, b) => {
-            const timeA = new Date(`1970/01/01 ${a.startTime}`).getTime();
-            const timeB = new Date(`1970/01/01 ${b.startTime}`).getTime();
-            return timeA - timeB;
-        });
-
-        const matchedSessionIds = [];
-
-        const sessionsHTML = todayClasses.map(cls => {
-            // Find matched live session
-            const liveSession = liveSessions.find(s => 
-                s.subjectName === cls.subjectName && 
-                s.startTime === cls.startTime &&
-                (!cls.teacherName || s.teacherName === cls.teacherName)
-            );
-
-            if (liveSession) {
-                matchedSessionIds.push(liveSession._id);
+                return;
             }
 
-            const isLive = liveSession && liveSession.status === 'live';
-            const isEnded = liveSession && liveSession.status === 'ended';
-            const classNameDisplay = currentUser && currentUser.class ? currentUser.class : 'Your Class';
+            // Sort chronologically
+            todayClasses.sort((a, b) => {
+                const timeA = new Date(`1970/01/01 ${a.startTime}`).getTime();
+                const timeB = new Date(`1970/01/01 ${b.startTime}`).getTime();
+                return timeA - timeB;
+            });
 
-            return `
+            const matchedSessionIds = [];
+
+            const sessionsHTML = todayClasses.map(cls => {
+                // Find matched live session
+                const liveSession = liveSessions.find(s =>
+                    s.subjectName?.trim().toLowerCase() === cls.subjectName?.trim().toLowerCase() &&
+                    s.startTime?.trim() === cls.startTime?.trim()
+                );
+
+                if (liveSession) {
+                    matchedSessionIds.push(liveSession._id);
+                }
+
+                const now = new Date();
+                const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+                const [endH, endM] = cls.endTime.split(':').map(Number);
+                const endTotalMinutes = endH * 60 + endM;
+                const isPastEndTime = currentTotalMinutes > endTotalMinutes;
+
+                const isLive = liveSession && liveSession.status === 'live' && !isPastEndTime;
+                const isCompleted = (liveSession && liveSession.status === 'completed') || isPastEndTime;
+                const isEnded = liveSession && liveSession.status === 'ended';
+                const classNameDisplay = currentUser && currentUser.class ? currentUser.class : 'Your Class';
+
+
+                return `
                 <div class="class-card ${isLive ? 'active-session' : ''}">
                     <div class="class-card-header">
                         <div>
                             <h4 class="class-subject">${cls.subjectName}</h4>
-                            <p class="class-name">${classNameDisplay}</p>
+                            <p class="class-name">Class: ${classNameDisplay}</p>
                         </div>
-                        <span class="status-badge ${isLive ? 'status-live' : isEnded ? 'status-ended' : 'status-scheduled'}">
-                            ${isLive ? '🔴 LIVE' : isEnded ? 'Completed' : 'Scheduled'}
+                        <span class="status-badge ${isLive ? 'status-live' : (isCompleted || isEnded) ? 'status-completed' : 'status-scheduled'}" style="${isEnded || isCompleted ? 'background: #d1fae5; color: #059669;' : ''}">
+                            ${isLive ? '🔴 LIVE' : isEnded ? 'Ended' : isCompleted ? 'Completed' : 'Scheduled'}
                         </span>
                     </div>
                     <div class="class-time">
@@ -1185,32 +1270,50 @@ function loadLiveSessions(isSilent = false) {
                         <i class="fas fa-user-tie" style="color: #94a3b8;"></i> <span>${cls.teacherName || 'Teacher'}</span>
                     </p>
                     <div class="class-actions" style="margin-top: 12px;">
-                        <button class="btn-action btn-join-live" onclick="${isLive ? `studentJoinSession('${liveSession._id}')` : ''}" ${!isLive ? 'disabled' : ''}>
-                            <i class="fas fa-video"></i> Join
-                        </button>
+                        ${isLive ? `
+                            <button class="btn-action btn-join-live" onclick="studentJoinSession('${liveSession._id}')">
+                                <i class="fas fa-video"></i> Join
+                            </button>
+                        ` : isCompleted ? `
+                            <div class="completed-status" style="width: 100%; text-align: center; padding: 10px; background: #f8fafc; color: #059669; font-weight: 600; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                <i class="fas fa-check-circle"></i> Completed
+                            </div>
+                        ` : `
+                            <button class="btn-action btn-join-live" disabled>
+                                <i class="fas fa-video"></i> Join
+                            </button>
+                        `}
                     </div>
                 </div>
             `;
-        }).join('');
+            }).join('');
 
-        // ────────────────────────────────────────────────
-        // Append Unmatched Active Sessions (Safety Net)
-        // ────────────────────────────────────────────────
-        const unmatchedSessions = liveSessions.filter(s => !matchedSessionIds.includes(s._id) && (s.status === 'live' || s.status === 'scheduled'));
-        const unmatchedHTML = unmatchedSessions.map(session => {
-            const isLive = session.status === 'live';
-            const isEnded = session.status === 'ended';
-            const classNameDisplay = currentUser && currentUser.class ? currentUser.class : 'Your Class';
+            // ────────────────────────────────────────────────
+            // Append Unmatched Active Sessions (Safety Net)
+            // ────────────────────────────────────────────────
+            const unmatchedSessions = liveSessions.filter(s => !matchedSessionIds.includes(s._id) && (s.status === 'live' || s.status === 'scheduled'));
+            const unmatchedHTML = unmatchedSessions.map(session => {
+                const now = new Date();
+                const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+                const [endH, endM] = session.endTime.split(':').map(Number);
+                const endTotalMinutes = endH * 60 + endM;
+                const isPastEndTime = currentTotalMinutes > endTotalMinutes;
 
-            return `
+                const isLive = session.status === 'live' && !isPastEndTime;
+                const isCompleted = session.status === 'completed' || isPastEndTime;
+                const isEnded = session.status === 'ended';
+                const classNameDisplay = currentUser && currentUser.class ? currentUser.class : 'Your Class';
+
+
+                return `
                 <div class="class-card ${isLive ? 'active-session' : ''}">
                     <div class="class-card-header">
                         <div>
                             <h4 class="class-subject">${session.subjectName}</h4>
                             <p class="class-name">${classNameDisplay}</p>
                         </div>
-                        <span class="status-badge ${isLive ? 'status-live' : isEnded ? 'status-ended' : 'status-scheduled'}">
-                            ${isLive ? '🔴 LIVE' : isEnded ? 'Completed' : 'Scheduled'}
+                        <span class="status-badge ${isLive ? 'status-live' : (isCompleted || isEnded) ? 'status-completed' : 'status-scheduled'}" style="${isEnded || isCompleted ? 'background: #d1fae5; color: #059669;' : ''}">
+                            ${isLive ? '🔴 LIVE' : isEnded ? 'Ended' : isCompleted ? 'Completed' : 'Scheduled'}
                         </span>
                     </div>
                     <div class="class-time">
@@ -1221,17 +1324,27 @@ function loadLiveSessions(isSilent = false) {
                         <i class="fas fa-user-tie" style="color: #94a3b8;"></i> <span>${session.teacherName || 'Teacher'}</span>
                     </p>
                     <div class="class-actions" style="margin-top: 12px;">
-                        <button class="btn-action btn-join-live" onclick="${isLive ? `studentJoinSession('${session._id}')` : ''}" ${!isLive ? 'disabled' : ''}>
-                            <i class="fas fa-video"></i> Join
-                        </button>
+                        ${isLive ? `
+                            <button class="btn-action btn-join-live" onclick="studentJoinSession('${session._id}')">
+                                <i class="fas fa-video"></i> Join
+                            </button>
+                        ` : isCompleted ? `
+                            <div class="completed-status" style="width: 100%; text-align: center; padding: 10px; background: #f8fafc; color: #059669; font-weight: 600; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                <i class="fas fa-check-circle"></i> Completed
+                            </div>
+                        ` : `
+                            <button class="btn-action btn-join-live" disabled>
+                                <i class="fas fa-video"></i> Join
+                            </button>
+                        `}
                     </div>
                 </div>
             `;
-        }).join('');
+            }).join('');
 
-        const finalHTML = sessionsHTML + unmatchedHTML;
+            const finalHTML = sessionsHTML + unmatchedHTML;
 
-        container.innerHTML = `
+            container.innerHTML = `
             <div class="live-class-container" style="max-width: 1200px; margin: 0 auto;">
                 <div style="background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -1248,18 +1361,18 @@ function loadLiveSessions(isSilent = false) {
                 </div>
             </div>
         `;
-    })
-    .catch(error => {
-        if (error !== 'Unauthorized') {
-            console.error('Error fetching live sessions:', error);
-            container.innerHTML = `<div class="dashboard-card" style="text-align: center; padding: 40px; color: #ef4444;"><i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 12px;"></i><p>Failed to load live sessions.</p></div>`;
-        }
-    });
+        })
+        .catch(error => {
+            if (error !== 'Unauthorized') {
+                console.error('Error fetching live sessions:', error);
+                container.innerHTML = `<div class="dashboard-card" style="text-align: center; padding: 40px; color: #ef4444;"><i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 12px;"></i><p>Failed to load live sessions.</p></div>`;
+            }
+        });
 }
 
 function studentJoinSession(sessionId) {
     const token = localStorage.getItem('token');
-    
+
     // Show loading toast or update button state if available
     if (typeof showToast === 'function') {
         showToast('Joining session...', 'info');
@@ -1268,24 +1381,24 @@ function studentJoinSession(sessionId) {
     fetch(`/api/live-session/${sessionId}/join`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success && result.data && result.data.meetingLink) {
-            window.open(result.data.meetingLink, '_blank');
-        } else {
-            if (typeof showToast === 'function') {
-                showToast(result.message || 'Failed to join session', 'danger');
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.data && result.data.meetingLink) {
+                window.open(result.data.meetingLink, '_blank');
             } else {
-                alert(result.message || 'Failed to join session');
+                if (typeof showToast === 'function') {
+                    showToast(result.message || 'Failed to join session', 'danger');
+                } else {
+                    alert(result.message || 'Failed to join session');
+                }
             }
-        }
-    })
-    .catch(error => {
-        console.error('Error joining session:', error);
-        if (typeof showToast === 'function') {
-            showToast('Error joining session', 'danger');
-        }
-    });
+        })
+        .catch(error => {
+            console.error('Error joining session:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error joining session', 'danger');
+            }
+        });
 }
 
 function openResetPasswordModal() {

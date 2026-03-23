@@ -7,7 +7,7 @@ exports.getMyProfile = async (req, res) => {
     const student = await User.findOne({
       userId: req.user.userId,
       role: "student"
-    }).select("-password -__v").lean();
+    }).select("-password -__v");
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });

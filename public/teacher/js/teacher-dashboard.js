@@ -514,7 +514,8 @@ async function initializeAttendancePage() {
             result.data.forEach(cls => {
                 const opt = document.createElement('option');
                 opt.value = cls._id;
-                opt.textContent = cls.name || cls.class || cls._id;
+                // Use class field for clean display (e.g., "10", "11", "12")
+                opt.textContent = cls.class || cls._id;
                 select.appendChild(opt);
             });
         }
@@ -1454,7 +1455,7 @@ async function fetchTeacherNotices() {
                             <span class="notice-type ${notice.type.toLowerCase()}">${notice.type}</span>
                         </div>
                         <div class="notice-item-body">
-                            <p><strong>Target Class:</strong> Class ${notice.targetClass}</p>
+                            <p><strong>Target Class:</strong> ${notice.targetClass}</p>
                             <p>${notice.content}</p>
                         </div>
                         <div class="notice-item-footer">
@@ -1618,7 +1619,7 @@ async function initializePostAnnouncement() {
                 document.getElementById('btn-submit-announcement').disabled = true;
             } else {
                 classSelect.innerHTML = '<option value="">-- Choose Class --</option>' +
-                    result.data.map(cls => `<option value="${cls._id}">${cls.name}</option>`).join('');
+                    result.data.map(cls => `<option value="${cls._id}">${cls.class}</option>`).join('');
             }
         }
     } catch (error) {
@@ -1675,18 +1676,43 @@ async function initializeCreateAssignment() {
 
     if (!classSelect || !form) return;
 
+    const subjectSelect = document.getElementById('assignment-subject');
+    if (subjectSelect) subjectSelect.innerHTML = '<option value="">-- Choose Subject --</option>';
+
     try {
-        const response = await fetch('/api/teachers/assigned-classes', {
+        const response = await fetch('/api/assignments/teacher/classes-subjects', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
 
         if (result.success) {
+            const classesData = result.data;
             classSelect.innerHTML = '<option value="">-- Choose Class --</option>' +
-                result.data.map(cls => `<option value="${cls._id}">${cls.name}</option>`).join('');
+                classesData.map(cls => `<option value="${cls.class}">${cls.class}</option>`).join('');
+
+            classSelect.addEventListener('change', (e) => {
+                const classVal = e.target.value;
+                console.log('Class Selected:', classVal);
+                console.log('Available Classes Data:', classesData);
+                if (!subjectSelect) return;
+
+                if (!classVal) {
+                    subjectSelect.innerHTML = '<option value="">-- Choose Subject --</option>';
+                    return;
+                }
+
+                const selected = classesData.find(c => String(c.class).trim() === String(classVal).trim());
+                console.log('Matching Class Found:', selected);
+                if (selected && selected.subjects && selected.subjects.length > 0) {
+                    subjectSelect.innerHTML = '<option value="">-- Choose Subject --</option>' +
+                        selected.subjects.map(sub => `<option value="${sub}">${sub}</option>`).join('');
+                } else {
+                    subjectSelect.innerHTML = '<option value="">No subjects assigned</option>';
+                }
+            });
         }
     } catch (error) {
-        console.error('Error fetching classes:', error);
+        console.error('Error fetching classes and subjects:', error);
     }
 
     form.addEventListener('submit', async (e) => {
@@ -1698,7 +1724,11 @@ async function initializeCreateAssignment() {
 
         const formData = new FormData();
         formData.append('title', document.getElementById('assignment-title').value);
-        formData.append('targetClass', document.getElementById('assignment-target-class').value);
+        formData.append('class', document.getElementById('assignment-target-class').value);
+        const subjectSelect = document.getElementById('assignment-subject');
+        if (subjectSelect) {
+            formData.append('subject', subjectSelect.value);
+        }
         formData.append('dueDate', document.getElementById('assignment-due-date').value);
         formData.append('totalMarks', document.getElementById('assignment-marks').value);
         formData.append('description', document.getElementById('assignment-description').value);
@@ -1709,7 +1739,7 @@ async function initializeCreateAssignment() {
         }
 
         try {
-            const res = await fetch('/api/teachers/assignments', {
+            const res = await fetch('/api/assignments', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -1788,7 +1818,7 @@ async function fetchTodaySchedule() {
                         if (t.day.toLowerCase() === today && t.teacherId === teacherMongoId) {
                             todaySessions.push({
                                 ...t,
-                                className: cls.name
+                                className: cls.class // Use class field for clean display
                             });
                         }
                     });
@@ -1909,7 +1939,7 @@ async function fetchWeeklySchedule() {
                             if (t.teacherId === teacherMongoId) {
                                 personalGrid[day].push({
                                     ...t,
-                                    className: cls.name,
+                                    className: cls.class, // Use class field for clean display
                                     class: cls.class
                                 });
                             }
@@ -2105,7 +2135,7 @@ async function fetchClassDetails() {
             if (header) {
                 header.innerHTML = `
                     <div class="class-info-main">
-                        <h1>${cls.name} <span class="class-badge">Class ${cls.class}</span></h1>
+                        <h1>Class ${cls.class} <span class="class-badge">${cls.class}</span></h1>
                         <p style="color: #64748b; margin-top: 5px;">${cls.isClassTeacher ? '<i class="fas fa-certificate" style="color: #ffd700;"></i> You are the Class Teacher' : 'Subject Teacher'}</p>
                     </div>
                     <div class="class-header-actions">
@@ -2201,7 +2231,7 @@ function renderStudentsTable(students) {
 
     tbody.innerHTML = students.map(s => `
         <tr>
-            <td><strong>#${s.rollNo || 'N/A'}</strong></td>
+            <td><strong>#${s.studentData?.rollNo || '-'}</strong></td>
             <td>
                 <div class="student-profile-mini">
                     <img src="${s.profileImage || '/images/default-avatar.png'}" class="student-img-mini">
@@ -2227,7 +2257,7 @@ function filterStudents(query) {
     const filtered = students.filter(s =>
         s.name.toLowerCase().includes(query.toLowerCase()) ||
         s.userId.toLowerCase().includes(query.toLowerCase()) ||
-        (s.rollNo && s.rollNo.toString().includes(query))
+        (s.studentData?.rollNo && s.studentData.rollNo.toString().includes(query))
     );
     renderStudentsTable(filtered);
 }
@@ -2294,7 +2324,7 @@ async function fetchAssignedClasses() {
             listContainer.innerHTML = result.data.map((cls, index) => `
                 <div class="class-item-card" onclick="showClassInDetail('${cls._id}', this)">
                     <div class="class-item-info">
-                        <h4>${cls.name}</h4>
+                        <h4>${cls.class}</h4>
                     </div>
                     <span class="class-item-badge ${cls.isClassTeacher ? 'class-teacher' : ''}">
                         ${cls.isClassTeacher ? 'Class Teacher' : 'Subject'}
@@ -2335,7 +2365,7 @@ function showClassInDetail(classId, element) {
         <div class="detail-content-wrapper">
             <div class="detail-header">
                 <div class="detail-title-area">
-                    <h1>${cls.name}</h1>
+                    <h1>${cls.class}</h1>
                     <div class="detail-subtitle">
                         <span class="detail-badge ${cls.isClassTeacher ? 'success' : 'primary'}">
                             <i class="fas ${cls.isClassTeacher ? 'fa-certificate' : 'fa-book-reader'}"></i> 
@@ -2548,7 +2578,6 @@ function renderStudentsTable(students) {
                     <th>Student Name</th>
                     <th>Class</th>
                     <th>Gender</th>
-                    <th>Parent</th>
                     <th>Contact</th>
                     <th style="text-align: center;">Action</th>
                 </tr>
@@ -2556,20 +2585,11 @@ function renderStudentsTable(students) {
             <tbody>
                 ${students.map((s, index) => `
                     <tr>
-                        <td style="font-weight: 600; color: #0A66FF;">#${s.rollNo || '-'}</td>
-                        <td>
-                            <div class="student-info-cell">
-                                <img src="${s.profileImage || '/images/default-avatar.png'}" alt="${s.name}" class="student-img-circle">
-                                <div>
-                                    <span class="student-name-main">${s.name}</span>
-                                    <span class="student-id-sub">${s.userId}</span>
-                                </div>
-                            </div>
-                        </td>
-                        <td><span class="class-pill">Class ${s.class || '-'}</span></td>
-                        <td style="text-transform: capitalize;">${s.gender || '-'}</td>
-                        <td>${s.parentName || '-'}</td>
-                        <td>${s.parentPhone || s.mobileNumber || '-'}</td>
+                        <td><strong>#${s.studentData?.rollNo || '-'}</strong></td>
+                        <td><span class="student-name-main">${s.name}</span></td>
+                        <td><span class="class-pill">${s.studentData?.class || '-'}</span></td>
+                        <td style="text-transform: capitalize;">${s.studentData?.gender || '-'}</td>
+                        <td>${s.mobileNumber || s.studentData?.parentDetails?.phone || s.studentData?.parentPhone || '-'}</td>
                         <td style="text-align: center;">
                             <button class="btn-view-profile" onclick="viewStudentProfile('${s.userId}')">
                                 <i class="fas fa-user"></i> View Profile
@@ -2631,42 +2651,36 @@ function showStudentProfileModal(student) {
     const modalHTML = `
         <div id="student-profile-modal" class="modal" style="display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
             <div class="modal-content" style="background: white; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px 12px 0 0;">
-                    <h2 style="margin: 0; font-size: 1.25rem;"><i class="fas fa-user-graduate"></i> Student Profile</h2>
+                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #0A66FF; color: white; border-radius: 12px 12px 0 0;">
+                    <h2 style="margin: 0; font-size: 1.25rem;"><i class="fas fa-user"></i> ${student.name}</h2>
                     <button onclick="closeStudentProfileModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
                 </div>
-                <div class="modal-body" style="padding: 24px;">
-                    <div style="display: flex; gap: 20px; margin-bottom: 24px;">
-                        <img src="${student.profileImage || '/images/default-avatar.png'}" alt="${student.name}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #e2e8f0;">
-                        <div style="flex: 1;">
-                            <h3 style="margin: 0 0 8px 0; font-size: 1.5rem; color: #1e293b;">${student.name}</h3>
-                            <p style="margin: 0 0 4px 0; color: #64748b;"><i class="fas fa-id-card"></i> ${student.userId}</p>
-                            <p style="margin: 0 0 4px 0; color: #64748b;"><i class="fas fa-graduation-cap"></i> Class ${student.class}</p>
-                            <span style="display: inline-block; padding: 4px 12px; background: #dbeafe; color: #1e40af; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">Roll No: ${student.rollNo || 'N/A'}</span>
+                <div class="modal-body" style="padding: 24px; color: #1e293b;">
+                    <!-- Basic Info Section -->
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 16px 0; font-size: 1rem; color: #0A66FF; display: flex; align-items: center; gap: 8px;"><i class="fas fa-info-circle"></i> Basic Information</h4>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                            <div><span style="color: #64748b; font-size: 13px;">Name:</span> <div style="font-weight: 600; font-size: 15px;">${student.name}</div></div>
+                            <div><span style="color: #64748b; font-size: 13px;">Class:</span> <div style="font-weight: 600; font-size: 15px;">${student.studentData?.class || 'N/A'}</div></div>
+                            <div><span style="color: #64748b; font-size: 13px;">Gender:</span> <div style="font-weight: 600; font-size: 15px; text-transform: capitalize;">${student.studentData?.gender || 'N/A'}</div></div>
+                            <div><span style="color: #64748b; font-size: 13px;">Date of Birth:</span> <div style="font-weight: 600; font-size: 15px;">${formatDate(student.studentData?.dob)}</div></div>
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
-                            <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #64748b; text-transform: uppercase;"><i class="fas fa-info-circle"></i> Personal Info</h4>
-                            <div style="margin-bottom: 8px;"><span style="color: #64748b;">Gender:</span> <strong style="color: #1e293b; text-transform: capitalize;">${student.gender || 'N/A'}</strong></div>
-                            <div style="margin-bottom: 8px;"><span style="color: #64748b;">Date of Birth:</span> <strong style="color: #1e293b;">${formatDate(student.dob)}</strong></div>
-                        </div>
-                        
-                        <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
-                            <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #64748b; text-transform: uppercase;"><i class="fas fa-user-friends"></i> Parent Info</h4>
-                            <div style="margin-bottom: 8px;"><span style="color: #64748b;">Name:</span> <strong style="color: #1e293b;">${student.parentName || 'N/A'}</strong></div>
-                            <div style="margin-bottom: 8px;"><span style="color: #64748b;">Relation:</span> <strong style="color: #1e293b; text-transform: capitalize;">${student.parentRelationship || 'N/A'}</strong></div>
-                            <div><span style="color: #64748b;">Contact:</span> <strong style="color: #1e293b;">${student.parentPhone || student.mobileNumber || 'N/A'}</strong></div>
+                    <!-- Contact Info Section -->
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 16px 0; font-size: 1rem; color: #0A66FF; display: flex; align-items: center; gap: 8px;"><i class="fas fa-phone-alt"></i> Contact Information</h4>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                            <div><span style="color: #64748b; font-size: 13px;">Mobile:</span> <div style="font-weight: 600; font-size: 15px;">${student.mobileNumber || 'N/A'}</div></div>
+                            <div><span style="color: #64748b; font-size: 13px;">Parent Contact:</span> <div style="font-weight: 600; font-size: 15px;">${student.studentData?.parentDetails?.phone || student.studentData?.parentPhone || 'N/A'}</div></div>
+                            <div style="grid-column: span 2;"><span style="color: #64748b; font-size: 13px;">Email:</span> <div style="font-weight: 600; font-size: 15px;">${student.email}</div></div>
                         </div>
                     </div>
-                    
-                    <div style="margin-top: 16px; background: #f8fafc; padding: 16px; border-radius: 8px;">
-                        <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #64748b; text-transform: uppercase;"><i class="fas fa-map-marker-alt"></i> Contact Info</h4>
-                        <div style="margin-bottom: 8px;"><span style="color: #64748b;">Email:</span> <strong style="color: #1e293b;">${student.email}</strong></div>
-                        <div style="margin-bottom: 8px;"><span style="color: #64748b;">Phone:</span> <strong style="color: #1e293b;">${student.mobileNumber || 'N/A'}</strong></div>
-                        <div style="margin-bottom: 8px;"><span style="color: #64748b;">Address:</span> <strong style="color: #1e293b;">${student.address || `${student.city || ''}, ${student.state || ''}, ${student.country || ''}`.replace(/^,\s*|,\s*$/g, '') || 'N/A'}</strong></div>
-                        <div><span style="color: #64748b;">Admission Date:</span> <strong style="color: #1e293b;">${formatDate(student.admissionDate || student.createdAt)}</strong></div>
+
+                    <!-- Address Section -->
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 12px;">
+                        <h4 style="margin: 0 0 16px 0; font-size: 1rem; color: #0A66FF; display: flex; align-items: center; gap: 8px;"><i class="fas fa-map-marker-alt"></i> Address Details</h4>
+                        <div><span style="color: #64748b; font-size: 13px;">Address:</span> <div style="font-weight: 600; font-size: 15px; margin-top: 4px;">${student.address || `${student.studentData?.city || ''}, ${student.studentData?.state || ''}, ${student.studentData?.country || ''}`.replace(/^,\s*|,\s*$/g, '') || 'N/A'}</div></div>
                     </div>
                 </div>
                 <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
@@ -2785,7 +2799,7 @@ async function initializeUploadMaterial() {
 
         if (result.success) {
             classSelect.innerHTML = '<option value="">-- Choose Class --</option>' +
-                result.data.map(cls => `<option value="${cls.class}">${cls.name} (Class ${cls.class})</option>`).join('');
+                result.data.map(cls => `<option value="${cls.class}">${cls.class}</option>`).join('');
         }
     } catch (error) {
         console.error('Error fetching classes:', error);
@@ -2915,7 +2929,7 @@ function populateMaterialsClassFilter() {
 
     const uniqueClasses = [...new Set(window.allMaterialsData.map(m => m.targetClass))];
     select.innerHTML = '<option value="all">All Classes</option>' +
-        uniqueClasses.map(c => `<option value="${c}">Class ${c}</option>`).join('');
+        uniqueClasses.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
 function filterMaterials() {
@@ -2972,7 +2986,7 @@ function renderMaterialsTable(materials) {
                         </div>
                     </div>
                 </td>
-                <td><span class="class-pill">Class ${m.targetClass}</span></td>
+                <td><span class="class-pill">${m.targetClass}</span></td>
                 <td><span class="truncate-text" style="max-width: 250px; display: inline-block;">${escapeHtmlFn(m.description || 'No description')}</span></td>
                 <td style="color: #64748b; font-size: 14px;">${date}</td>
                 <td style="text-align: right;">
@@ -3695,6 +3709,7 @@ function populateClassDropdown() {
 
     // Add change listener to update subjects (remove old listener first)
     classSelect.onchange = function () {
+        console.log("Class dropdown changed. Selected value:", this.value);
         populateSubjectDropdown(this.value);
     };
 }
@@ -3706,11 +3721,20 @@ function populateSubjectDropdown(className) {
     const subjectSelect = document.getElementById('assignment-subject');
 
     // Reset subject dropdown
-    subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+    if (subjectSelect) subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+
+    console.log("Populating subjects for class name:", className);
+    console.log("Cached teacherClasses data:", teacherClasses);
 
     if (!className) return;
 
-    const classData = teacherClasses.find(tc => tc.class === className);
+    if (!teacherClasses) {
+        console.log("teacherClasses is undefined or empty!");
+        return;
+    }
+
+    const classData = teacherClasses.find(tc => String(tc.class).trim() === String(className).trim());
+    console.log("Found class data for dropdown match:", classData);
 
     if (classData && classData.subjects && classData.subjects.length > 0) {
         classData.subjects.forEach(sub => {

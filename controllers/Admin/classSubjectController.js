@@ -40,8 +40,7 @@ exports.autoSeedClasses = async () => {
 
         let seededCount = 0;
         for (let i = 1; i <= 12; i++) {
-            const classStr = i.toString();
-            const existingClass = await ClassSubject.findOne({ class: classStr });
+            const existingClass = await ClassSubject.findOne({ class: i });
             
             if (!existingClass) {
                 console.log(`[autoSeedClasses] Seeding missing Class ${i}...`);
@@ -50,7 +49,7 @@ exports.autoSeedClasses = async () => {
                 
                 await ClassSubject.create({
                     name: `Class ${i}`,
-                    class: classStr,
+                    class: i,
                     subjects: subjects
                 });
                 seededCount++;
@@ -168,7 +167,6 @@ exports.getSubjects = async (req, res) => {
             c.subjects.forEach(s => {
                 allSubjects.push({
                     ...s.toObject(),
-                    className: c.name,
                     class: c.class,
                     classId: c._id
                 });

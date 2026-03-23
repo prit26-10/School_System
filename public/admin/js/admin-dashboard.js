@@ -2510,11 +2510,11 @@ function renderAssignClassTable(classes) {
                 </td>
                 <td>
                     ${isAssigned ? `
-                        <button class="action-btn-circle unassign" title="Unassign Teacher" onclick="removeTeacherAssignment('${cls._id}')">
+                        <button class="action-btn-circle unassign" title="Unassign Teacher" onclick="removeTeacherAssignment('${cls.class}')">
                             <i class="fas fa-unlink"></i>
                         </button>
                     ` : `
-                        <button class="action-btn-circle assign" title="Assign Teacher" onclick="openAssignClassModal('${cls._id}')">
+                        <button class="action-btn-circle assign" title="Assign Teacher" onclick="openAssignClassModal('${cls.class}')">
                             <i class="fas fa-link"></i>
                         </button>
                     `}
@@ -2538,7 +2538,7 @@ async function openAssignClassModal(classId = '') {
     if (AppState.allTeachers.length === 0) await loadTeachersData();
     if (AppState.allClasses.length === 0) await loadClassesData();
 
-    const selectedClass = classId ? AppState.allClasses.find(c => c._id === classId) : null;
+    const selectedClass = classId ? AppState.allClasses.find(c => c.class == classId) : null;
 
     const content = `
         <form class="form-horizontal" id="assign-class-form">
@@ -2546,7 +2546,7 @@ async function openAssignClassModal(classId = '') {
                 <label>Select Class</label>
                 <select id="assign-class-id" required ${classId ? 'disabled' : ''}>
                     <option value="">Choose Class...</option>
-                    ${AppState.allClasses.map(c => `<option value="${c._id}" ${c._id === classId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    ${AppState.allClasses.map(c => `<option value="${c.class}" ${c.class == classId ? 'selected' : ''}>${c.class}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -2771,7 +2771,7 @@ function renderAssignSubjectTable(subjects) {
                         <span class="subject-meta-sub">Code: ${sub.code || '-'} | Credits: ${sub.credits || '0'}</span>
                     </div>
                 </td>
-                <td><span class="class-pill-badge">${sub.className || '-'}</span></td>
+                <td><span class="class-pill-badge">${sub.class || '-'}</span></td>
                 <td>
                     ${isAssigned ? `
                         <div class="teacher-info-cell">
@@ -2790,11 +2790,11 @@ function renderAssignSubjectTable(subjects) {
                 </td>
                 <td>
                     ${isAssigned ? `
-                        <button class="action-btn-circle unassign" title="Unassign Teacher" onclick="removeSubjectAssignment('${sub.classId}', '${sub._id}')">
+                        <button class="action-btn-circle unassign" title="Unassign Teacher" onclick="removeSubjectAssignment('${sub.class}', '${sub._id}')">
                             <i class="fas fa-unlink"></i>
                         </button>
                     ` : `
-                        <button class="action-btn-circle assign" title="Assign Teacher" onclick="openAssignSubjectModal('${sub._id}', '${sub.classId}')">
+                        <button class="action-btn-circle assign" title="Assign Teacher" onclick="openAssignSubjectModal('${sub._id}', '${sub.class}')">
                             <i class="fas fa-link"></i>
                         </button>
                     `}
@@ -3543,7 +3543,7 @@ async function initializeTimetable() {
         if (result.success) {
             ttClasses = result.data;
             classSelect.innerHTML = '<option value="">Select a class</option>' +
-                ttClasses.map(c => `<option value="${c._id}">${c.name} (${c.class})</option>`).join('');
+                ttClasses.map(c => `<option value="${c.class}">${c.class}</option>`).join('');
         }
     } catch (error) {
         console.error('Error fetching classes for timetable:', error);
@@ -3804,7 +3804,7 @@ function renderDefineFees() {
                                 <label class="fees-form-label">Select Class</label>
                                 <select id="fees-class-id" class="fees-form-input" required>
                                     <option value="">Choose Class...</option>
-                                    ${sortedClasses.map(c => `<option value="${c._id}">${c.name}</option>`).join('')}
+                                    ${sortedClasses.map(c => `<option value="${c.class}">${c.class}</option>`).join('')}
                                 </select>
                             </div>
                             
@@ -5736,18 +5736,10 @@ async function loadDefinedFees() {
                 .map(fee => {
                     // classId is populated object from backend
                     const classData = fee.classId || {};
-                    const classIdForEdit = classData._id || fee.classId;
+                    const classIdForEdit = classData.class || fee.classId; // Use numeric class for edit lookup
                     
                     const subjectsCount = fee.totalSubjects || classData.subjects?.length || 5;
-                    
-                    // Build class name from populated data
-                    // Use name field if available, otherwise construct from class field
-                    let className = classData.name;
-                    if (!className && classData.class) {
-                        className = `Class ${classData.class}`;
-                    }
-                    // Final fallback - should not happen with valid data
-                    if (!className) className = 'Unknown';
+                    const className = classData.class || 'Unknown';
 
                     return `
                     <tr>
@@ -5758,7 +5750,7 @@ async function loadDefinedFees() {
                         <td><span class="text-total-green">₹${fee.totalFee.toLocaleString()}</span></td>
                         <td style="color: #888; font-size: 13px;">${formatDate(fee.updatedAt)}</td>
                         <td>
-                            <button class="btn-edit-yellow" title="Edit Fee" onclick="editFee('${classIdForEdit}', ${fee.tuitionFee}, ${fee.examFee})">
+                            <button class="btn-edit-yellow" title="Edit Fee" onclick="editFee('${className}', ${fee.tuitionFee}, ${fee.examFee})">
                                 <i class="fas fa-edit"></i>
                             </button>
                         </td>
@@ -5813,16 +5805,16 @@ async function loadPaymentClasses() {
 
         const result = await response.json();
         if (result.success && result.data) {
-            // Extract unique classes from student data
-            const uniqueClasses = [...new Map(result.data.map(s => [s.class_id, { id: s.class_id, name: s.class_name }])).values()];
+            // Extract unique classes from student data (using numeric class)
+            const uniqueClasses = [...new Set(result.data.map(s => s.class))].filter(Boolean);
 
             const classSelect = document.getElementById('payment-class-filter');
             if (classSelect) {
-                // Sort classes by name
-                const sortedClasses = uniqueClasses.sort((a, b) => a.name.localeCompare(b.name));
+                // Sort classes numerically
+                const sortedClasses = uniqueClasses.sort((a, b) => a - b);
 
                 classSelect.innerHTML = '<option value="">All Classes</option>' +
-                    sortedClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                    sortedClasses.map(c => `<option value="${c}">${c}</option>`).join('');
             }
         }
     } catch (error) {
@@ -5877,14 +5869,14 @@ function renderPaymentTable(students) {
         return `
             <tr>
                 <td><strong>${student.student_name}</strong></td>
-                <td>${student.class_name}</td>
+                <td>${student.class}</td>
                 <td>₹${student.total_fees.toLocaleString()}</td>
                 <td>₹${student.paid_amount.toLocaleString()}</td>
                 <td><span class="status-badge ${statusClass}">${student.status}</span></td>
                 <td>${formatDate(student.due_date)}</td>
                 <td>
                     ${student.status === 'pending' ?
-                `<button class="btn btn-success" onclick="openPaymentModal('${student.student_id}', '${student.student_name}', '${student.class_name}', ${student.total_fees}, ${student.paid_amount})">
+                `<button class="btn btn-success" onclick="openPaymentModal('${student.student_id}', '${student.student_name}', '${student.class}', ${student.total_fees}, ${student.paid_amount})">
                             <i class="fas fa-check-circle"></i> Mark as Paid
                         </button>` :
                 `<button class="btn btn-success" onclick="generateSingleReceipt('${student.student_id}')">

@@ -218,15 +218,17 @@ exports.approveTeacherApplication = async (req, res) => {
         password: hashedPassword,
         role: 'teacher',
         mobileNumber: application.phone,
-        streetAddress: application.streetAddress,
-        city: application.city,
-        state: application.state,
-        country: application.country,
         timezone: application.timezone || 'Asia/Kolkata',
-        department: application.department,
-        position: application.position,
-        experience: application.experience,
-        qualification: application.qualification
+        teacherData: {
+          department: application.department,
+          qualification: application.qualification,
+          experience: application.experience,
+          streetAddress: application.streetAddress,
+          city: application.city,
+          state: application.state,
+          zipCode: application.zipCode,
+          country: application.country
+        }
       });
 
       // Send approval email with credentials

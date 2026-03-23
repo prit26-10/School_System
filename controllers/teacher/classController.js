@@ -65,11 +65,10 @@ exports.getAssignedClasses = async (req, res) => {
         const assignedClassValues = classes.map(cls => normalizeClassValue(cls.class)).filter(Boolean);
         console.log("Assigned class values:", assignedClassValues);
 
-        // Fetch students only from User table - all student data is now stored here
-        const students = await User.find({
-            role: "student",
-            class: { $in: assignedClassValues.map(cv => new RegExp(cv, 'i')) }
-        }).select("name email userId rollNo profileImage mobileNumber age city state country class dob gender parentName parentRelationship parentPhone").sort({ rollNo: 1 }).lean();
+        // Fetch all students and filter by class in JS to avoid Mongoose casting issues
+        const allStudents = await User.find({ role: "student" })
+            .select("class name email userId profileImage mobileNumber age studentData")
+            .lean();
 
         // For each class, filter students that belong to it
         const classesWithDetails = classes.map((cls) => {
@@ -77,7 +76,17 @@ exports.getAssignedClasses = async (req, res) => {
             const name = cls.name;   // e.g. "Class 11"
 
             // Filter students belonging to this class
-            const validStudents = students.filter(s => isClassMatch(s.class, classValue));
+            const validStudents = allStudents.filter(s => {
+                const studentClass = s.class || s.studentData?.class;
+                return isClassMatch(studentClass, classValue);
+            });
+
+            // Sort logic
+            validStudents.sort((a, b) => {
+                const rollA = a.studentData?.rollNo || 0;
+                const rollB = b.studentData?.rollNo || 0;
+                return rollA - rollB;
+            });
 
             console.log(`Class: ${name} (Class: ${classValue}), Valid Student Count: ${validStudents.length}`);
 
@@ -131,14 +140,23 @@ exports.getClassDetails = async (req, res) => {
         const name = cls.name;   // e.g. "Class 11"
         const normalizedClassValue = normalizeClassValue(classValue);
 
-        // Fetch students only from User table - all student data is now stored here
-        const students = await User.find({
-            role: "student",
-            class: new RegExp(normalizedClassValue, 'i')
-        }).select("name email userId rollNo profileImage mobileNumber age city state country class dob gender parentName parentRelationship parentPhone streetAddress zipCode").sort({ rollNo: 1 }).lean();
+        // Fetch all students and filter by class in JS to avoid Mongoose casting issues
+        const allStudents = await User.find({ role: "student" })
+            .select("class name email userId profileImage mobileNumber age studentData")
+            .lean();
 
         // Filter students belonging to this class
-        const validStudents = students.filter(s => isClassMatch(s.class, classValue));
+        const validStudents = allStudents.filter(s => {
+            const studentClass = s.class || s.studentData?.class;
+            return isClassMatch(studentClass, classValue);
+        });
+
+        // Sort students
+        validStudents.sort((a, b) => {
+            const rollA = a.studentData?.rollNo || 0;
+            const rollB = b.studentData?.rollNo || 0;
+            return rollA - rollB;
+        });
 
         console.log(`[getClassDetails] Class: ${name} (Class: ${classValue}), Valid Student Count: ${validStudents.length}`);
 
@@ -211,15 +229,18 @@ exports.getAssignedClassStudents = async (req, res) => {
         const name = cls.name;
         const normalizedClassValue = normalizeClassValue(classValue);
 
-        // Fetch students only from User table - all student data is now stored here
-        const students = await User.find({
-            role: "student",
-            class: new RegExp(normalizedClassValue, 'i')
-        }).select("name email userId rollNo profileImage mobileNumber age city state country class dob gender parentName parentRelationship parentPhone streetAddress zipCode createdAt").sort({ rollNo: 1 }).lean();
+        // Fetch all students and filter by class in JS to avoid Mongoose casting issues
+        const allStudents = await User.find({ role: "student" })
+            .select("class name email userId profileImage mobileNumber age studentData createdAt")
+            .lean();
 
         // Filter students belonging to this class and build address
-        const validStudents = students.filter(s => isClassMatch(s.class, classValue)).map(s => {
-            const addressParts = [s.streetAddress, s.city, s.state, s.zipCode, s.country].filter(Boolean);
+        const validStudents = allStudents.filter(s => {
+            const studentClass = s.class || s.studentData?.class;
+            return isClassMatch(studentClass, classValue);
+        }).map(s => {
+            const studentData = s.studentData || {};
+            const addressParts = [studentData.streetAddress, studentData.city, studentData.state, studentData.zipCode, studentData.country].filter(Boolean);
             return {
                 ...s,
                 address: addressParts.join(', ') || null,

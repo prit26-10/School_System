@@ -89,14 +89,14 @@ exports.getTeacherStats = async (req, res) => {
       }
     });
     
-    // Fetch students only from User table - all student data is now stored here
-    const students = await User.find({
-      role: "student",
-      class: { $in: assignedClassValues.map(cv => new RegExp(cv, 'i')) }
-    }).select("class").lean();
+    // Fetch all students and filter by class in JS to avoid Mongoose casting issues
+    const allStudents = await User.find({ role: "student" }).select("class studentData").lean();
 
     // Filter students by class match
-    const validStudents = students.filter(s => isClassMatch(s.class, assignedClasses));
+    const validStudents = allStudents.filter(s => {
+      const studentClass = s.class || s.studentData?.class;
+      return isClassMatch(studentClass, assignedClasses);
+    });
 
     const totalQuizzes = await Quiz.countDocuments({ teacherId });
     const totalSessions = await SessionSlot.countDocuments({ teacherId });
@@ -138,14 +138,28 @@ exports.getStudents = async (req, res) => {
     // Get all unique class values assigned to this teacher
     const assignedClassValues = assignedClasses.map(cls => normalizeClassValue(cls.class)).filter(Boolean);
     
-    // Fetch students only from User table - all student data is now stored here
-    const students = await User.find({
-      role: "student",
-      class: { $in: assignedClassValues.map(cv => new RegExp(cv, 'i')) }
-    }).select("-password").sort({ class: 1, rollNo: 1 }).lean();
+    // Fetch all students and filter by class in JS to avoid Mongoose casting issues
+    const allStudents = await User.find({ role: "student" })
+      .select("class name email userId profileImage mobileNumber studentData")
+      .lean();
 
     // Filter students by class match
-    const filteredStudents = students.filter(s => isClassMatch(s.class, assignedClasses));
+    const filteredStudents = allStudents.filter(s => {
+      const studentClass = s.class || s.studentData?.class;
+      return isClassMatch(studentClass, assignedClasses);
+    });
+
+    // Sort students by class and rollNo
+    filteredStudents.sort((a, b) => {
+      const classA = a.class || a.studentData?.class || "";
+      const classB = b.class || b.studentData?.class || "";
+      if (classA !== classB) {
+        return String(classA).localeCompare(String(classB), undefined, { numeric: true });
+      }
+      const rollA = a.studentData?.rollNo || 0;
+      const rollB = b.studentData?.rollNo || 0;
+      return rollA - rollB;
+    });
 
     res.json({ success: true, data: filteredStudents });
   } catch (err) {

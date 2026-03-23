@@ -4,7 +4,10 @@ const jwtAuth = require("../middleware/jwtAuth");
 const roleAuth = require("../middleware/roleAuth");
 const liveSessionController = require("../controllers/teacher/liveSessionController");
 
-// All routes require authentication
+// All routes require authentication EXCEPT webhook
+// Handle Zoom Webhooks (No JWT required, verification is payload-based)
+router.post("/webhook", liveSessionController.zoomWebhook);
+
 router.use(jwtAuth);
 
 // Create a new live session with automatic meeting link

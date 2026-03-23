@@ -12,7 +12,7 @@ exports.generateTimetable = async (req, res) => {
             });
         }
 
-        const classDoc = await ClassSubject.findById(classId);
+        const classDoc = await ClassSubject.findOne({ class: parseInt(classId) });
         if (!classDoc) {
             return res.status(404).json({ success: false, message: "Class not found" });
         }
@@ -33,8 +33,13 @@ exports.generateTimetable = async (req, res) => {
             });
         }
 
-        // Validation 1: All subjects must have a teacher assigned
-        const missingTeachers = subjects.filter(s => !s.assignedTeacher || !s.assignedTeacher.teacherId);
+        // Validation 1: All subjects must have a teacher assigned (Subject Teacher or Class Teacher fallback)
+        const classTeacher = classDoc.assignedTeacher && classDoc.assignedTeacher.teacherId ? classDoc.assignedTeacher : null;
+
+        const missingTeachers = subjects.filter(s => 
+            (!s.assignedTeacher || !s.assignedTeacher.teacherId) && !classTeacher
+        );
+
         if (missingTeachers.length > 0) {
             let msg = "";
             if (missingTeachers.length === subjects.length) {
@@ -82,7 +87,7 @@ exports.generateTimetable = async (req, res) => {
         const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
         // Conflict Detection: Build a map of busy teachers across other classes
-        const otherClasses = await ClassSubject.find({ _id: { $ne: classId } });
+        const otherClasses = await ClassSubject.find({ class: { $ne: parseInt(classId) } });
         const busyMap = {}; // day -> slotStart -> Set(teacherIds)
 
         otherClasses.forEach(c => {
@@ -112,7 +117,8 @@ exports.generateTimetable = async (req, res) => {
                 let assigned = false;
                 for (let i = 0; i < subjectStats.length; i++) {
                     const s = subjectStats[i];
-                    const tId = s.assignedTeacher.teacherId;
+                    const tId = (s.assignedTeacher && s.assignedTeacher.teacherId) ? s.assignedTeacher.teacherId : classTeacher.teacherId;
+                    const tName = (s.assignedTeacher && s.assignedTeacher.teacherId) ? s.assignedTeacher.teacherName : classTeacher.teacherName;
 
                     const isBusy = busyMap[day] && busyMap[day][slot.start] && busyMap[day][slot.start].has(tId);
 
@@ -123,7 +129,7 @@ exports.generateTimetable = async (req, res) => {
                             endTime: slot.end,
                             subjectName: s.name,
                             subjectCode: s.code,
-                            teacherName: s.assignedTeacher.teacherName,
+                            teacherName: tName,
                             teacherId: tId
                         });
                         s.count++;
@@ -135,14 +141,17 @@ exports.generateTimetable = async (req, res) => {
                 // Absolute fallback (rarely reachable if teacher pool is sufficient)
                 if (!assigned) {
                     const s = subjectStats[0];
+                    const tId = (s.assignedTeacher && s.assignedTeacher.teacherId) ? s.assignedTeacher.teacherId : classTeacher.teacherId;
+                    const tName = (s.assignedTeacher && s.assignedTeacher.teacherId) ? s.assignedTeacher.teacherName : classTeacher.teacherName;
+
                     timetable.push({
                         day,
                         startTime: slot.start,
                         endTime: slot.end,
                         subjectName: s.name,
                         subjectCode: s.code,
-                        teacherName: s.assignedTeacher.teacherName,
-                        teacherId: s.assignedTeacher.teacherId
+                        teacherName: tName,
+                        teacherId: tId
                     });
                     s.count++;
                 }
@@ -168,7 +177,7 @@ exports.generateTimetable = async (req, res) => {
 exports.getTimetable = async (req, res) => {
     try {
         const { classId } = req.params;
-        const classDoc = await ClassSubject.findById(classId);
+        const classDoc = await ClassSubject.findOne({ class: parseInt(classId) });
 
         if (!classDoc) {
             return res.status(404).json({ success: false, message: "Class not found" });

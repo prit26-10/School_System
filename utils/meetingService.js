@@ -171,9 +171,49 @@ async function deleteZoomMeeting(meetingId) {
     }
 }
 
+/**
+ * Check Zoom meeting status
+ * @param {string} meetingId - The Zoom meeting ID
+ * @returns {Promise<Object>} Status object
+ */
+async function checkZoomMeetingStatus(meetingId) {
+    try {
+        if (!ZOOM_API_KEY || !ZOOM_API_SECRET || !ZOOM_ACCOUNT_ID) {
+            return { success: true, status: "started", isMock: true }; // Assume started for mock
+        }
+
+        const accessToken = await getZoomAccessToken();
+
+        const response = await axios.get(
+            `https://api.zoom.us/v2/meetings/${meetingId}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
+            }
+        );
+
+        return {
+            success: true,
+            status: response.data.status, // 'waiting', 'started', 'ended'
+            startTime: response.data.start_time,
+            duration: response.data.duration
+        };
+    } catch (error) {
+        console.error("Error checking Zoom meeting status:", error.response?.data || error.message);
+        // If 404, meeting might have been deleted or expired
+        if (error.response?.status === 404) {
+            return { success: true, status: "ended", message: "Meeting not found" };
+        }
+        return { success: false, message: error.message };
+    }
+}
+
 module.exports = {
     createZoomMeeting,
     deleteZoomMeeting,
+    checkZoomMeetingStatus,
     generateGoogleMeetLink,
     generateMockMeeting
 };
+

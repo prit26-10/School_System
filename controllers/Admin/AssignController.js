@@ -17,14 +17,14 @@ exports.assignTeacherToClass = async (req, res) => {
         const finalTeacherId = teacherId || bodyTeacherId;
 
         if (!classId) {
-            return res.status(400).json({ success: false, message: "Class ID is required" });
+            return res.status(400).json({ success: false, message: "Class is required" });
         }
         if (!finalTeacherId) {
             return res.status(400).json({ success: false, message: "Teacher ID is required" });
         }
 
-        if (!mongoose.Types.ObjectId.isValid(classId)) {
-            return res.status(400).json({ success: false, message: "Invalid Class ID format" });
+        if (isNaN(parseInt(classId))) {
+            return res.status(400).json({ success: false, message: "Invalid Class format" });
         }
         if (!mongoose.Types.ObjectId.isValid(finalTeacherId)) {
             return res.status(400).json({ success: false, message: "Invalid Teacher ID format" });
@@ -39,9 +39,9 @@ exports.assignTeacherToClass = async (req, res) => {
             });
         }
 
-        // Atomic update using findByIdAndUpdate
-        const updatedClass = await ClassSubject.findByIdAndUpdate(
-            classId,
+        // Atomic update using findOneAndUpdate by numeric class
+        const updatedClass = await ClassSubject.findOneAndUpdate(
+            { class: parseInt(classId) },
             {
                 $set: {
                     assignedTeacher: {
@@ -104,12 +104,12 @@ exports.removeTeacherFromClass = async (req, res) => {
         const { classId } = req.params;
         console.log(`[ASSIGN] Removing teacher from class ${classId}`);
 
-        if (!mongoose.Types.ObjectId.isValid(classId)) {
-            return res.status(400).json({ success: false, message: "Invalid Class ID" });
+        if (isNaN(parseInt(classId))) {
+            return res.status(400).json({ success: false, message: "Invalid Class format" });
         }
 
-        const updatedClass = await ClassSubject.findByIdAndUpdate(
-            classId,
+        const updatedClass = await ClassSubject.findOneAndUpdate(
+            { class: parseInt(classId) },
             {
                 $unset: { assignedTeacher: "" }
             },
@@ -145,7 +145,7 @@ exports.assignTeacherToSubject = async (req, res) => {
         const { teacherId, teacher: bodyTeacherId } = req.body;
         const finalTeacherId = teacherId || bodyTeacherId;
 
-        if (!mongoose.Types.ObjectId.isValid(classId) || !mongoose.Types.ObjectId.isValid(subjectId)) {
+        if (isNaN(parseInt(classId)) || !mongoose.Types.ObjectId.isValid(subjectId)) {
             return res.status(400).json({ success: false, message: "Invalid Class or Subject ID" });
         }
         if (!finalTeacherId || !mongoose.Types.ObjectId.isValid(finalTeacherId)) {
@@ -161,7 +161,7 @@ exports.assignTeacherToSubject = async (req, res) => {
         }
 
         const updatedClass = await ClassSubject.findOneAndUpdate(
-            { _id: classId, "subjects._id": subjectId },
+            { class: parseInt(classId), "subjects._id": subjectId },
             {
                 $set: {
                     "subjects.$.assignedTeacher": {
@@ -202,12 +202,12 @@ exports.removeTeacherFromSubject = async (req, res) => {
     try {
         const { classId, subjectId } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(classId) || !mongoose.Types.ObjectId.isValid(subjectId)) {
+        if (isNaN(parseInt(classId)) || !mongoose.Types.ObjectId.isValid(subjectId)) {
             return res.status(400).json({ success: false, message: "Invalid Class or Subject ID" });
         }
 
         const updatedClass = await ClassSubject.findOneAndUpdate(
-            { _id: classId, "subjects._id": subjectId },
+            { class: parseInt(classId), "subjects._id": subjectId },
             {
                 $unset: { "subjects.$.assignedTeacher": "" }
             },
