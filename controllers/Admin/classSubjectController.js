@@ -168,6 +168,7 @@ exports.getSubjects = async (req, res) => {
                 allSubjects.push({
                     ...s.toObject(),
                     class: c.class,
+                    className: c.name,
                     classId: c._id
                 });
             });

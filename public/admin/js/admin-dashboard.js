@@ -1399,15 +1399,25 @@ async function loadSubjects() {
             const allSubjects = result.data;
             AppState.allSubjects = allSubjects;
 
-            // Extract unique classes for filter
-            const uniqueClasses = [...new Map(allSubjects.map(s => [s.classId, { _id: s.classId, name: s.className }])).values()];
+            // Extract unique classes for filter with fallback handling
+            const uniqueClasses = [...new Map(allSubjects
+                .filter(s => s.classId && s.class) // Filter out invalid entries
+                .map(s => [s.classId, {
+                    _id: s.classId,
+                    class: `Class-${s.class}` // Fallback to "Class N" if className is missing
+                }])
+            ).values()];
 
             // Update filters and tables if they exist
             const filter = safeGetElement('subjects-class-filter');
             if (filter) {
                 const currentVal = filter.value;
-                filter.innerHTML = '<option value="all">All Classes</option>' +
-                    uniqueClasses.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+                if (uniqueClasses.length > 0) {
+                    filter.innerHTML = '<option value="all">All Classes</option>' +
+                        uniqueClasses.map(c => `<option value="${c._id}">${c.class}</option>`).join('');
+                } else {
+                    filter.innerHTML = '<option value="all">All Classes</option><option disabled>No Classes Available</option>';
+                }
                 filter.value = currentVal;
             }
 
@@ -1416,8 +1426,12 @@ async function loadSubjects() {
             // Also update the Assignment filter if it's currently showing
             const assignFilter = safeGetElement('assign-subjects-class-filter');
             if (assignFilter && (assignFilter.innerHTML.trim() === '<option value="all">All Classes</option>' || assignFilter.options.length <= 1)) {
-                assignFilter.innerHTML = '<option value="all">All Classes</option>' +
-                    uniqueClasses.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+                if (uniqueClasses.length > 0) {
+                    assignFilter.innerHTML = '<option value="all">All Classes</option>' +
+                        uniqueClasses.map(c => `<option value="${c._id}">${c.class}</option>`).join('');
+                } else {
+                    assignFilter.innerHTML = '<option value="all">All Classes</option><option disabled>No Classes Available</option>';
+                }
             }
         } else {
             if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 20px;">${result.message || 'Failed to load subjects'}</td></tr>`;
@@ -1443,7 +1457,7 @@ function renderSubjectsTable(subjects) {
         <tr>
             <td><span class="mgmt-row-text">${sub.name || '-'}</span></td>
             <td><span class="mgmt-code-text">${sub.code || '-'}</span></td>
-            <td><span class="mgmt-row-subtext">${sub.className || '-'}</span></td>
+            <td><span class="mgmt-row-subtext">${sub.class || '-'}</span></td>
             <td><span class="mgmt-row-text">${sub.credits || '-'}</span></td>
             <td>
                 <div class="action-buttons">
@@ -2741,7 +2755,7 @@ async function loadSubjectsForAssignment() {
         if (classFilter && AppState.allClasses.length > 0) {
             const currentVal = classFilter.value;
             classFilter.innerHTML = '<option value="all">All Classes</option>' +
-                AppState.allClasses.map(c => `<option value="${c._id}" ${c._id === currentVal ? 'selected' : ''}>${c.name} (${c.class})</option>`).join('');
+                AppState.allClasses.map(c => `<option value="${c._id}" ${c._id === currentVal ? 'selected' : ''}>Class - ${c.class}</option>`).join('');
         }
 
         filterAssignSubjects();
@@ -3139,7 +3153,7 @@ function renderAcademicCalendar() {
         if (isCurrentMonth && items.length > 0) {
             const primaryItem = items[0];
             const hType = primaryItem.type?.toLowerCase() || "holiday";
-            
+
             // Add background class to the cell
             if (hType === 'holiday') {
                 dayClass += ' holiday-bg';
@@ -3215,7 +3229,7 @@ function renderAcademicList(filterType = 'all') {
 
     const sorted = [...filtered].sort((a, b) => new Date(a.date) - new Date(b.date));
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
+
     listContainer.innerHTML = sorted.map(item => {
         const start = new Date(item.date);
         const dayNum = start.getUTCDate();
@@ -3385,7 +3399,7 @@ function renderTimetable() {
 async function checkExistingTimetableStatus() {
     const classId = document.getElementById('tt-class-select').value;
     const msgEl = document.getElementById('timetable-status-msg');
-    
+
     if (!classId) {
         msgEl.style.display = 'none';
         return;
@@ -3483,8 +3497,8 @@ function downloadTimetablePDF() {
                                 ${slot.start}<br><span style="font-size: 9px; color: #94a3b8; font-weight: 500;">to</span><br>${slot.end}
                             </td>
                             ${days.map(day => {
-                                const entry = grouped[day].find(e => e.startTime === slot.start);
-                                return `
+        const entry = grouped[day].find(e => e.startTime === slot.start);
+        return `
                                     <td style="border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; padding: 8px; text-align: center; vertical-align: middle; height: 50px;">
                                         ${entry ? `
                                             <div style="font-weight: 700; font-size: 12px; color: #0052cc; margin-bottom: 2px; line-height: 1.1;">${entry.subjectName}</div>
@@ -3492,7 +3506,7 @@ function downloadTimetablePDF() {
                                         ` : '<span style="color: #cbd5e1; font-size: 14px;">•</span>'}
                                     </td>
                                 `;
-                            }).join('')}
+    }).join('')}
                         </tr>
                     `).join('')}
                 </tbody>
@@ -3543,7 +3557,7 @@ async function initializeTimetable() {
         if (result.success) {
             ttClasses = result.data;
             classSelect.innerHTML = '<option value="">Select a class</option>' +
-                ttClasses.map(c => `<option value="${c.class}">${c.class}</option>`).join('');
+                ttClasses.map(c => `<option value="${c.class}">Class-${c.class}</option>`).join('');
         }
     } catch (error) {
         console.error('Error fetching classes for timetable:', error);
@@ -3804,7 +3818,7 @@ function renderDefineFees() {
                                 <label class="fees-form-label">Select Class</label>
                                 <select id="fees-class-id" class="fees-form-input" required>
                                     <option value="">Choose Class...</option>
-                                    ${sortedClasses.map(c => `<option value="${c.class}">${c.class}</option>`).join('')}
+                                    ${sortedClasses.map(c => `<option value="${c.class}">Class-${c.class}</option>`).join('')}
                                 </select>
                             </div>
                             
@@ -5737,7 +5751,7 @@ async function loadDefinedFees() {
                     // classId is populated object from backend
                     const classData = fee.classId || {};
                     const classIdForEdit = classData.class || fee.classId; // Use numeric class for edit lookup
-                    
+
                     const subjectsCount = fee.totalSubjects || classData.subjects?.length || 5;
                     const className = classData.class || 'Unknown';
 
@@ -5814,7 +5828,7 @@ async function loadPaymentClasses() {
                 const sortedClasses = uniqueClasses.sort((a, b) => a - b);
 
                 classSelect.innerHTML = '<option value="">All Classes</option>' +
-                    sortedClasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                    sortedClasses.map(c => `<option value="${c}">Class-${c}</option>`).join('');
             }
         }
     } catch (error) {
@@ -6012,12 +6026,12 @@ async function generateBulkReceipts() {
         // Get current filter values for the report header
         const classFilter = document.getElementById('payment-class-filter')?.value || '';
         const statusFilter = document.getElementById('payment-status-filter')?.value || 'all';
-        
+
         // Get filter display names
         const classSelect = document.getElementById('payment-class-filter');
-        const classFilterName = classFilter ? 
+        const classFilterName = classFilter ?
             classSelect.options[classSelect.selectedIndex].text : 'All Classes';
-        const statusFilterName = statusFilter === 'all' ? 'All' : 
+        const statusFilterName = statusFilter === 'all' ? 'All' :
             statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
 
         // Generate comprehensive receipt report
@@ -6171,11 +6185,11 @@ function generatePaymentReportPDF(students, filters) {
         const remaining = student.total_fees - student.paid_amount;
 
         // Format dates
-        const paymentDate = student.payment_date ? 
-            new Date(student.payment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
+        const paymentDate = student.payment_date ?
+            new Date(student.payment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) :
             '-';
-        const dueDate = student.due_date ? 
-            new Date(student.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
+        const dueDate = student.due_date ?
+            new Date(student.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) :
             '-';
 
         // Set status color
