@@ -142,22 +142,10 @@
                                 <i class="fas fa-table"></i>
                                 <span>View Exam Timetable</span>
                             </a>
-                            <a href="#" class="nav-item" data-page="upload-question-paper"
-                                data-title="Upload Question Paper">
-                                <i class="fas fa-upload"></i>
-                                <span>Upload Question Paper</span>
+                            <a href="#" class="nav-item" data-page="exam-submissions-marks" data-title="Submission & Marks">
+                                <i class="fas fa-check-double"></i>
+                                <span>Submission & Marks</span>
                             </a>
-                            <a href="#" class="nav-item" data-page="enter-marks" data-title="Enter Marks">
-                                <i class="fas fa-edit"></i>
-                                <span>Enter Marks</span>
-                            </a>
-                            <a href="#" class="nav-item" data-page="view-results" data-title="View Result">
-                                <i class="fas fa-chart-bar"></i>
-                                <span>View Result</span>
-                            </a>
-                            <a href="#" class="nav-item" data-page="submit-results" data-title="Submit Result to Admin">
-                                <i class="fas fa-paper-plane"></i>
-                                <span>Submit Result to Admin</span>
                             </a>
                         </div>
                     </div>
@@ -451,15 +439,20 @@
                     <!-- Populated dynamically -->
                 </div>
                 <div id="evaluation-submission-preview"
-                    style="margin-bottom: 20px; text-align: center; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <!-- Populated dynamically -->
+                <div id="evaluation-submission-preview"
+                    style="margin-bottom: 20px; text-align: center; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; display: none;">
+                    <!-- Only show for file assignments -->
+                </div>
+                
+                <div id="evaluation-questions-container" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                    <!-- Populated dynamically with text answers -->
                 </div>
                 <form id="evaluation-form">
                     <input type="hidden" id="evaluation-submission-id">
                     <div class="form-row two-col">
                         <div class="form-group">
                             <label for="evaluation-marks">Marks <span class="required">*</span></label>
-                            <input type="number" id="evaluation-marks" class="form-input" min="0" required>
+                            <input type="number" id="evaluation-marks" class="form-input" min="0" readonly placeholder="Auto-calculated">
                         </div>
                         <div class="form-group">
                             <label for="evaluation-total-marks">Total Marks</label>
@@ -468,9 +461,9 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="evaluation-feedback">Feedback</label>
-                            <textarea id="evaluation-feedback" class="form-textarea" rows="4"
-                                placeholder="Enter feedback for the student"></textarea>
+                            <label for="evaluation-feedback">Overall Feedback</label>
+                            <textarea id="evaluation-feedback" class="form-textarea" rows="3"
+                                placeholder="Enter general feedback for the student"></textarea>
                         </div>
                     </div>
                 </form>
@@ -502,6 +495,32 @@
         </div>
     </div>
 
+    <!-- Manage Exam Questions Modal -->
+    <div id="manage-questions-modal" class="modal" style="display: none; z-index: 1050;">
+        <div class="modal-content" style="max-width: 800px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; border-radius: 12px; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; border-radius: 12px 12px 0 0;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Manage Exam Questions</h2>
+                <button class="modal-close" onclick="closeManageQuestionsModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #fff;">
+                <input type="hidden" id="manage-questions-timetable-id">
+                
+                <div id="questions-list-container" style="margin-bottom: 20px;">
+                    <!-- Dynamically populated questions go here -->
+                </div>
+
+                <button class="btn btn-secondary" onclick="addEmptyQuestionField()" style="width: 100%; border: 1px dashed #cbd5e1; background: #f8fafc; color: #475569; padding: 12px; border-radius: 8px; font-weight: 600;">
+                    <i class="fas fa-plus"></i> Add Question
+                </button>
+            </div>
+            
+            <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeManageQuestionsModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveExamQuestions()" style="background: #2563eb; color: white;">Save Questions</button>
+            </div>
+        </div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="/reset-password/reset-password.js"></script>
     <script src="/teacher/js/teacher-dashboard.js"></script>

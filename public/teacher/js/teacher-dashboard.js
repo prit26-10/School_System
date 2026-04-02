@@ -279,10 +279,7 @@ function loadPage(page, title = null) {
         'view-announcements': renderAnnouncements,
         'post-announcement': renderPostAnnouncement,
         'exam-timetable': renderExamTimetable,
-        'upload-question-paper': renderUploadPaper,
-        'enter-marks': renderEnterMarks,
-        'view-results': renderViewResults,
-        'submit-results': renderSubmitResults,
+        'exam-submissions-marks': renderExamSubmissionsMarks,
         'view-attendance': renderAttendancePage,
         'edit-attendance': renderAttendancePage,
         'submit-attendance': renderAttendancePage,
@@ -339,6 +336,10 @@ function initializePageScripts(page) {
         fetchStudents();
     } else if (page === 'view-announcements') {
         fetchTeacherNotices();
+    } else if (page === 'exam-timetable') {
+        fetchTeacherExamTimetable();
+    } else if (page === 'exam-submissions-marks') {
+        fetchTeacherExamsForSubmissionsMarks();
     } else if (page === 'post-announcement') {
         initializePostAnnouncement();
     } else if (page === 'manage-assignments') {
@@ -3031,7 +3032,7 @@ function renderUpdateMaterial() { return Components.EmptyState('sync-alt', 'Upda
 function renderDeleteMaterial() { return Components.EmptyState('trash-alt', 'Delete Material', 'Remove study materials from the system.'); }
 function renderCreateLiveSession() { return Components.EmptyState('video', 'Create Live Session', 'Schedule and set up virtual classrooms.'); }
 function renderJoinSession() { return Components.EmptyState('sign-in-alt', 'Start / Join Class', 'Start or enter your scheduled live sessions.'); }
-function renderExamTimetable() { return Components.EmptyState('table', 'Exam Timetable', 'View or manage the examination schedule.'); }
+function renderUploadPaper() { return renderExamTimetable(); }
 function renderGenerateLink() { return Components.EmptyState('link', 'Generate Meeting Link', 'Generate a meeting link for your live session.'); }
 function renderSendSessionNotification() { return Components.EmptyState('paper-plane', 'Send Session Notification', 'Notify students about the live session.'); }
 function renderMarkSessionAttendance() { return Components.EmptyState('user-check', 'Mark Attendance', 'Mark attendance for the live session.'); }
@@ -4341,3 +4342,819 @@ window.saveEvaluation = async function (action = 'save') {
         alert('Connection error');
     }
 };
+
+
+// Replaced by consolidated version below
+
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// --- Helpers ---
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+function renderExamTimetable() {
+    return `
+        <div class="exam-timetable-container" style="padding: 20px;">
+            <div class="card" style="background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+                <div style="margin-bottom: 25px;">
+                    <h2 style="font-size: 1.5rem; color: #1e293b; font-weight: 700; margin: 0;">My Exam Schedule</h2>
+                    <p style="color: #64748b; font-size: 0.9rem; margin-top: 5px;">View your assigned exams and upload question papers</p>
+                </div>
+                
+                <div class="exam-table-wrapper" style="overflow-x: auto;">
+                    <table class="exam-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #f1f5f9;">
+                                <th style="text-align: left; padding: 16px 12px; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em;">Date & Time</th>
+                                <th style="text-align: left; padding: 16px 12px; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em;">Subject</th>
+                                <th style="text-align: left; padding: 16px 12px; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em;">Class</th>
+                                <th style="text-align: right; padding: 16px 12px; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em;">Progress & Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-exam-tbody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 80px 20px; color: #cbd5e1;">
+                                    <div class="loading-spinner" style="width: 32px; height: 32px; margin: 0 auto 16px;"></div>
+                                    <p style="font-size: 0.9rem; font-weight: 500;">Securing your schedule...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upload Modal -->
+        <div id="paper-upload-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:white; padding:30px; border-radius:20px; width:450px; max-width:90%; position: relative;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3 style="margin:0; font-weight:700; color: #1e293b;">Upload Question Paper</h3>
+                    <button onclick="closePaperUploadModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color: #94a3b8;">&times;</button>
+                </div>
+                <form id="paper-upload-form" onsubmit="handlePaperUpload(event)">
+                    <input type="hidden" id="upload-timetable-id">
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:600; color:#475569; font-size: 0.9rem;">Select Questionnaire File</label>
+                        <div style="border: 2px dashed #e2e8f0; border-radius: 12px; padding: 25px; text-align: center; background: #f8fafc; transition: all 0.2s;" id="modal-drop-zone">
+                            <i class="fas fa-file-pdf" style="font-size: 32px; color: #cbd5e1; margin-bottom: 15px; display: block;"></i>
+                            <input type="file" id="paper-file" accept=".pdf,.doc,.docx" required style="display: none;" onchange="updateModalFileName(this)">
+                            <button type="button" onclick="document.getElementById('paper-file').click()" style="background: white; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">Browse Files</button>
+                            <p id="modal-file-name" style="margin-top: 10px; font-size: 0.8rem; color: #64748b;"></p>
+                        </div>
+                        <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 8px;"><i class="fas fa-info-circle"></i> Max size 5MB. PDF, DOC, or DOCX formats accepted.</p>
+                    </div>
+                    <button type="submit" id="paper-upload-submit-btn" class="btn btn-primary" style="width:100%; padding:12px; font-weight:700; border-radius:12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <i class="fas fa-upload"></i> <span>Upload & Save</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    `;
+}
+
+function updateModalFileName(input) {
+    const fileName = input.files[0] ? input.files[0].name : '';
+    document.getElementById('modal-file-name').textContent = fileName;
+}
+
+async function fetchTeacherExamTimetable() {
+    const tbody = document.getElementById('teacher-exam-tbody');
+    if (!tbody) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/teacher/timetable', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (result.success && result.data.length > 0) {
+            tbody.innerHTML = result.data.map(entry => {
+                const isUploaded = entry.paperUploadStatus === 'uploaded';
+                const statusColor = isUploaded ? '#10b981' : '#f59e0b';
+                const statusBg = isUploaded ? '#d1fae5' : '#fffbeb';
+                const statusIcon = isUploaded ? 'fa-check-circle' : 'fa-clock';
+                
+                // --- Actions Logic ---
+                // Only Subject Teachers see the Upload button
+                let actionsHtml = '';
+                if (entry.isSubjectTeacher) {
+                    if (!isUploaded) {
+                        actionsHtml = `
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="openPaperUploadModal('${entry._id}')" style="padding: 10px 18px; background: #0A66FF; color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                                    <i class="fas fa-file-upload"></i> Upload Paper
+                                </button>
+                                <button onclick="openManageQuestionsModal('${entry._id}', '${entry.subjectName}')" style="padding: 10px 18px; background: #8b5cf6; color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                                    <i class="fas fa-list-ol"></i> Manage Questions
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        actionsHtml = `
+                            <div style="display: flex; gap: 12px; align-items: center; justify-content: flex-end;">
+                                <div style="color: #10b981; font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; background: #ecfdf5; padding: 4px 10px; border-radius: 6px;">
+                                    <i class="fas fa-check"></i> Submitted
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    <button onclick="openPaperUploadModal('${entry._id}')" title="Replace file" style="background: white; border: 1px solid #e2e8f0; color: #64748b; width: 34px; height: 34px; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-sync-alt" style="font-size: 0.8rem;"></i>
+                                    </button>
+                                    ${entry.questionPaper ? `
+                                        <a href="/${entry.questionPaper}" target="_blank" title="Preview" style="background: white; border: 1px solid #e2e8f0; color: #0A66FF; width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                                            <i class="fas fa-eye" style="font-size: 0.8rem;"></i>
+                                        </a>
+                                    ` : ''}
+                                    <button onclick="openManageQuestionsModal('${entry._id}', '${entry.subjectName}')" title="Manage Questions" style="background: white; border: 1px solid #e2e8f0; color: #8b5cf6; width: 34px; height: 34px; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-list-ol" style="font-size: 0.8rem;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else if (entry.isClassTeacher) {
+                    actionsHtml = `
+                        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
+                            <span style="color: #94a3b8; font-size: 0.75rem; font-weight: 500;">Supervisor View</span>
+                            ${entry.questionPaper ? `
+                                <a href="/${entry.questionPaper}" target="_blank" style="background: #f8fafc; color: #64748b; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-decoration: none; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-file-pdf"></i> Preview
+                                </a>
+                            ` : '<span style="color: #cbd5e1; font-size: 0.75rem;">Waiting for upload</span>'}
+                        </div>
+                    `;
+                }
+
+                return `
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: all 0.2s;">
+                        <td style="padding: 24px 12px;">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 0.9rem;">${formatDate(entry.date)}</div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px; display: flex; align-items: center; gap: 8px;">
+                                <span style="display: inline-flex; align-items: center; gap: 4px; border-right: 1px solid #e2e8f0; padding-right: 8px;">
+                                    <i class="far fa-clock"></i> ${entry.startTime}
+                                </span>
+                                <span>${entry.duration}m</span>
+                            </div>
+                        </td>
+                        <td style="padding: 24px 12px;">
+                            <div style="font-weight: 600; color: #334155; font-size: 0.95rem;">${entry.subjectName}</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px; letter-spacing: 0.02em;">CODE: ${entry.subjectCode}</div>
+                        </td>
+                        <td style="padding: 24px 12px;">
+                            <span style="font-weight: 700; color: #1e293b; font-size: 0.85rem; border-left: 3px solid #0A66FF; padding-left: 10px;">CLASS ${entry.class}</span>
+                        </td>
+                        <td style="padding: 24px 12px; text-align: right;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; min-height: 40px;">
+                                ${actionsHtml}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 120px 20px; color: #94a3b8;">
+                        <div style="margin-bottom: 24px;">
+                            <i class="far fa-folder-open" style="font-size: 40px; color: #f1f5f9;"></i>
+                        </div>
+                        <h4 style="color: #475569; margin-bottom: 12px; font-weight: 600; font-size: 1.1rem;">No Exam Schedule Found</h4>
+                        <p style="font-size: 0.9rem; max-width: 320px; margin: 0 auto; color: #94a3b8; line-height: 1.6;">
+                            Your current assignments don't include any active examination schedules.
+                        </p>
+                    </td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Error fetching teacher timetable:', error);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 50px; color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Failed to secure schedule.</td></tr>';
+    }
+}
+
+function openPaperUploadModal(id) {
+    const modal = document.getElementById('paper-upload-modal');
+    if (!modal) return;
+    
+    document.getElementById('upload-timetable-id').value = id;
+    document.getElementById('paper-file').value = '';
+    document.getElementById('modal-file-name').textContent = '';
+    
+    modal.style.display = 'flex';
+}
+
+function closePaperUploadModal() {
+    const modal = document.getElementById('paper-upload-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+}
+
+async function handlePaperUpload(event) {
+    event.preventDefault();
+    const id = document.getElementById('upload-timetable-id').value;
+    const fileInput = document.getElementById('paper-file');
+    const file = fileInput.files[0];
+    const submitBtn = document.getElementById('paper-upload-submit-btn');
+
+    if (!file) {
+        showToast('Please select a file first', 'warning');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('questionPaper', file); // Field name must match multer config in routes
+
+    // Show loading state
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Uploading...</span>';
+    submitBtn.disabled = true;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/teacher/upload-paper/${id}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('Question paper uploaded successfully!', 'success');
+            closePaperUploadModal();
+            fetchTeacherExamTimetable();
+        } else {
+            showToast(result.message || 'Upload failed', 'error');
+        }
+    } catch (error) {
+        console.error('Error uploading paper:', error);
+        showToast('Connection error during upload', 'error');
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+
+// ============================================
+// EXAM SUBMISSIONS & MARKS MODULE
+// ============================================
+
+/**
+ * Consolidated Exam Submissions & Marks Module
+ * Allows teachers to browse exams and manage both submissions and grading.
+ */
+function renderExamSubmissionsMarks() {
+    return `
+        <div class="exam-management-container" style="padding: 20px;">
+            <div class="dashboard-header" style="margin-bottom: 30px;">
+                <h2 style="font-size: 1.75rem; color: #0f172a; font-weight: 700; margin: 0; letter-spacing: -0.02em;">Submission & Marks</h2>
+                <p style="color: #64748b; font-size: 0.95rem; margin-top: 8px;">Review student answer sheets and record examination grades.</p>
+            </div>
+            
+            <div id="submissions-marks-exam-list" class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+                <!-- Exams will load here -->
+                <div style="grid-column: 1/-1; text-align: center; padding: 100px;">
+                    <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
+                    <p style="color: #94a3b8; font-weight: 500;">Retrieving assigned examinations...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unified Grading & Submissions Modal -->
+        <div id="exam-marks-entry-modal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.45); z-index:1000; align-items:center; justify-content:center; backdrop-filter: blur(8px);">
+            <div style="background:white; padding:0; border-radius:24px; width:1100px; max-width:95%; max-height: 90vh; overflow: hidden; position: relative; box-shadow: 0 25px 70px -12px rgba(0, 0, 0, 0.3); border: 1px solid rgba(226, 232, 240, 0.8);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; padding: 30px 40px; border-bottom: 1px solid #f8fafc;">
+                    <div>
+                        <div id="marks-modal-tag" style="display: inline-block; padding: 4px 12px; background: #eff6ff; color: #0A66FF; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Grading Dashboard</div>
+                        <h3 id="marks-modal-title" style="margin:0; font-weight:800; color: #0f172a; font-size: 24px; letter-spacing: -0.5px;">Grades & Submissions</h3>
+                        <p id="marks-modal-subtitle" style="margin: 6px 0 0; font-size: 0.95rem; color: #64748b; font-weight: 500;"></p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <button onclick="saveAllMarks()" class="btn-primary" style="padding: 12px 28px; border-radius: 12px; font-weight: 700; background: #0A66FF; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(10, 102, 255, 0.2);">
+                            <i class="fas fa-paper-plane"></i> Submit Marks to Admin
+                        </button>
+                        <button onclick="closeMarksEntryModal()" style="background:#f8fafc; border:none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor:pointer; color: #94a3b8; font-size: 20px; transition: all 0.2s ease;">&times;</button>
+                    </div>
+                </div>
+                <div id="modal-marks-table-container" style="padding: 0; overflow-y: auto; max-height: calc(90vh - 120px);">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Fetch exams for the consolidated Submission & Marks view
+ */
+async function fetchTeacherExamsForSubmissionsMarks() {
+    const listContainer = document.getElementById('submissions-marks-exam-list');
+    if (!listContainer) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/teacher/timetable', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (result.success && result.data.length > 0) {
+            // Filter to ONLY show subjects where the logged-in teacher is assigned
+            const assignedExams = result.data.filter(exam => exam.isSubjectTeacher);
+
+            if (assignedExams.length > 0) {
+                listContainer.innerHTML = assignedExams.map(exam => {
+                    return `
+                        <div class="exam-card-modern" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; transition: all 0.2s ease;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                                <span style="background: #f8fafc; color: #475569; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">Class ${exam.class}</span>
+                            </div>
+                            
+                            <h3 style="margin: 0; color: #0f172a; font-size: 1.25rem; font-weight: 600;">${exam.subjectName}</h3>
+                            
+                            <div style="display: flex; align-items: center; margin: 12px 0 24px; color: #64748b; font-size: 0.85rem;">
+                                <i class="far fa-calendar-alt" style="margin-right: 8px; color: #94a3b8;"></i>
+                                <span>${formatDate(exam.date)}</span>
+                            </div>
+                            
+                            <div style="padding-top: 16px; border-top: 1px solid #f8fafc;">
+                                <button onclick="openMarksEntrySheet('${exam._id}', '${exam.subjectName}', 'Class ${exam.class}')" style="width: 100%; padding: 10px; background: #0f172a; color: white; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='#0f172a'">
+                                    Manage Grades & Papers
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                listContainer.innerHTML = `<div style="grid-column: 1/-1">${Components.EmptyState('folder-open', 'No Subjects Assigned', 'You are not assigned to any subjects for grading at this time.')}</div>`;
+            }
+        } else {
+            listContainer.innerHTML = `<div style="grid-column: 1/-1">${Components.EmptyState('folder-open', 'No Subjects Assigned', 'You are not assigned to any subjects for grading at this time.')}</div>`;
+        }
+    } catch (error) {
+        console.error('Error fetching submission-marks list:', error);
+        listContainer.innerHTML = `<div style="grid-column: 1/-1">${Components.ErrorState('Failed to initialize management dashboard')}</div>`;
+    }
+}
+
+/**
+ * Handle Viewing Submissions for a specific Exam
+ */
+async function viewExamSubmissions(timetableId, subject, className) {
+    const modal = document.getElementById('exam-submission-list-modal');
+    const container = document.getElementById('modal-submission-table-container');
+    
+    document.getElementById('modal-exam-title').textContent = `${subject} Submissions`;
+    document.getElementById('modal-exam-subtitle').textContent = className;
+    
+    container.innerHTML = Components.LoadingState('Fetching student papers...');
+    modal.style.display = 'flex';
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/teacher/submissions/${timetableId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #f1f5f9;">
+                            <th style="text-align: left; padding: 12px; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Student</th>
+                            <th style="text-align: left; padding: 12px; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Submission Date</th>
+                            <th style="text-align: center; padding: 12px; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${result.data.map(sub => `
+                            <tr style="border-bottom: 1px solid #f8fafc;">
+                                <td style="padding: 15px 12px;">
+                                    <div style="font-weight: 600; color: #1e293b;">${sub.studentName}</div>
+                                    <div style="font-size: 0.75rem; color: #94a3b8;">${sub.studentUserId}</div>
+                                </td>
+                                <td style="padding: 15px 12px; color: #64748b; font-size: 0.85rem;">
+                                    ${formatDate(sub.submissionDate)}
+                                </td>
+                                <td style="padding: 15px 12px; text-align: center;">
+                                    ${sub.fileUrl ? `
+                                        <a href="/${sub.fileUrl}" target="_blank" class="btn" style="padding: 6px 14px; background: #f1f5f9; color: #0A66FF; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; border: 1px solid #e2e8f0; display: inline-flex; align-items: center; gap: 6px;">
+                                            <i class="fas fa-eye"></i> View Paper
+                                        </a>
+                                    ` : '<span style="color: #cbd5e1; font-size: 0.8rem;">No file</span>'}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            container.innerHTML = Components.EmptyState('file-alt', 'No Student Submissions', 'No answer sheets have been uploaded for this exam yet.');
+        }
+    } catch (error) {
+        console.error('Error fetching submissions:', error);
+        container.innerHTML = Components.ErrorState('Could not retrieve submissions');
+    }
+}
+
+/**
+ * Handle Opening the Marks Entry Sheet
+ */
+async function openMarksEntrySheet(timetableId, subject, className) {
+    const modal = document.getElementById('exam-marks-entry-modal');
+    const container = document.getElementById('modal-marks-table-container');
+    
+    document.getElementById('marks-modal-title').textContent = `${subject} Marks Entry`;
+    document.getElementById('marks-modal-subtitle').textContent = className;
+    
+    container.innerHTML = Components.LoadingState('Preparing grading sheet...');
+    modal.style.display = 'flex';
+    
+    // Store timetable ID for saving
+    modal.dataset.timetableId = timetableId;
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/teacher/grading-sheet/${timetableId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data.length > 0) {
+            window.currentGradingData = result.data; // Store for text evaluation
+            container.innerHTML = `
+                <div style="padding: 0 40px 40px;">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 20px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 15px 20px; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9;">Student Details</th>
+                                <th style="text-align: center; padding: 15px 20px; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9;">Submission</th>
+                                <th style="text-align: left; padding: 15px 20px; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9; width: 140px;">Awarded Marks</th>
+                                <th style="text-align: left; padding: 15px 20px; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9;">Evaluator Feedback</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${result.data.map(student => `
+                                <tr class="student-mark-row" data-student-id="${student.studentId}" style="transition: background 0.2s ease;" onmouseover="this.style.backgroundColor='#fcfdff'" onmouseout="this.style.backgroundColor='transparent'">
+                                    <td style="padding: 20px; border-bottom: 1px solid #f8fafc;">
+                                        <div style="font-weight: 700; color: #1e293b; font-size: 15px;">${student.studentName}</div>
+                                        <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">ID: ${student.studentUserId}</div>
+                                    </td>
+                                    <td style="padding: 20px; text-align: center; border-bottom: 1px solid #f8fafc;">
+                                        ${student.answers && student.answers.length > 0 ? `
+                                            <button onclick="openEvaluateTextModal('${timetableId}', '${student.studentId}', '${escapeHtml(student.studentName)}')" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 8px 16px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease;">
+                                                <i class="fas fa-tasks"></i> Evaluate Answers
+                                            </button>
+                                        ` : student.fileUrl ? `
+                                            <a href="/${student.fileUrl}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; color: #0A66FF; background: #f0f7ff; padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 700; transition: all 0.2s ease;">
+                                                <i class="fas fa-file-pdf" style="font-size: 14px;"></i> View Paper
+                                            </a>
+                                        ` : '<span style="color: #cbd5e1; font-size: 12px; font-weight: 500;">No submission</span>'}
+                                    </td>
+                                    <td style="padding: 20px; border-bottom: 1px solid #f8fafc;">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <input type="number" class="mark-input" value="${student.marks !== null ? student.marks : ''}" placeholder="0" min="0" max="${student.totalMarks || 100}" 
+                                                style="width: 70px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 700; color: #1e293b; text-align: center; outline: none; transition: border-color 0.2s ease; font-size: 15px;"
+                                                onfocus="this.style.borderColor='#0A66FF';this.style.backgroundColor='#fcfdff'" 
+                                                onblur="this.style.borderColor='#e2e8f0';this.style.backgroundColor='white'">
+                                            <span style="color: #94a3b8; font-size: 13px; font-weight: 600;">/ ${student.totalMarks || 100}</span>
+                                        </div>
+                                    </td>
+                                    <td style="padding: 20px; border-bottom: 1px solid #f8fafc;">
+                                        <input type="text" class="feedback-input" value="${student.feedback || ''}" placeholder="Excellent performance..." 
+                                            style="width: 100%; padding: 10px 15px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #475569; outline: none; transition: all 0.2s ease;"
+                                            onfocus="this.style.borderColor='#0A66FF';this.style.boxShadow='0 0 0 3px rgba(10,102,255,0.05)'" 
+                                            onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    
+                    <div style="margin-top: 30px; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: flex-start; gap: 15px;">
+                        <div style="background: #e2e8f0; color: #475569; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">
+                            <i class="fas fa-info"></i>
+                        </div>
+                        <div style="font-size: 0.9rem; color: #475569; line-height: 1.5;">
+                            Confirm all entries before submitting. Once you click <strong>Submit Marks to Admin</strong>, the evaluations will be finalized and sent to the administrative department for result processing.
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = Components.EmptyState('users', 'No Enrollment Found', 'No students are currently enrolled in this class for this subject.');
+        }
+    } catch (error) {
+        console.error('Error fetching marks sheet:', error);
+        container.innerHTML = Components.ErrorState('Could not initialize grading sheet');
+    }
+}
+
+/**
+ * Save all entered marks
+ */
+async function saveAllMarks() {
+    const modal = document.getElementById('exam-marks-entry-modal');
+    const timetableId = modal.dataset.timetableId;
+    const saveBtn = modal.querySelector('.btn-primary');
+    const originalText = saveBtn.innerHTML;
+
+    const rows = document.querySelectorAll('.student-mark-row');
+    const marksData = Array.from(rows).map(row => ({
+        studentId: row.dataset.studentId,
+        marks: row.querySelector('.mark-input').value === '' ? null : Number(row.querySelector('.mark-input').value),
+        feedback: row.querySelector('.feedback-input').value
+    }));
+
+    try {
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        saveBtn.disabled = true;
+
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/teacher/save-marks/${timetableId}`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ marks: marksData })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('All marks saved successfully!', 'success');
+            closeMarksEntryModal();
+        } else {
+            showToast(result.message || 'Failed to save marks', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving marks:', error);
+        showToast('Connection error while saving', 'error');
+    } finally {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    }
+}
+
+/**
+ * Modal Controls
+ */
+function closeSubmissionListModal() {
+    document.getElementById('exam-submission-list-modal').style.display = 'none';
+}
+
+function closeMarksEntryModal() {
+    document.getElementById('exam-marks-entry-modal').style.display = 'none';
+}
+
+// ============================================
+// EXAM TEXT QUESTIONS & EVALUATION MODULE
+// ============================================
+
+async function openManageQuestionsModal(timetableId, subjectName) {
+    document.getElementById('manage-questions-timetable-id').value = timetableId;
+    const modal = document.getElementById('manage-questions-modal');
+    modal.style.display = 'flex';
+    
+    const container = document.getElementById('questions-list-container');
+    container.innerHTML = `<div style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #0A66FF;"></i></div>`;
+    
+    try {
+        const token = localStorage.getItem('token');
+        // Re-use student endpoint or teacher endpoint. Wait, teacher has getGradingSheet...
+        // Actually, we can fetch the timetable details. The timetable endpoint should return questions.
+        // Or we can just call `/api/exams/teacher/timetable` and find the timetable manually.
+        // Since we don't have a specific GET questions route for teachers, let's create a temporary structure.
+        // Actually, let's just make a fetch call. Wait, I didn't make a GET route for teacher questions!
+        // But timetable object has `.questions`... let's fetch timetable from `/api/exams/teacher/timetable`
+        const response = await fetch('/api/exams/teacher/timetable', { headers: { 'Authorization': `Bearer ${token}` } });
+        const result = await response.json();
+        
+        const timetable = result.data.find(t => t._id === timetableId);
+        container.innerHTML = '';
+        
+        if (timetable && timetable.questions && timetable.questions.length > 0) {
+            timetable.questions.forEach(q => addEmptyQuestionField(q));
+        } else {
+            addEmptyQuestionField(); // Add one empty field by default
+        }
+    } catch (error) {
+        console.error('Error fetching questions:', error);
+        container.innerHTML = '<div style="color: red; text-align: center;">Error loading questions</div>';
+    }
+}
+
+function closeManageQuestionsModal() {
+    document.getElementById('manage-questions-modal').style.display = 'none';
+}
+
+function addEmptyQuestionField(questionObj = null) {
+    const container = document.getElementById('questions-list-container');
+    const div = document.createElement('div');
+    div.className = 'question-entry-item';
+    div.style.cssText = 'background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 12px; display: flex; gap: 12px; align-items: flex-start;';
+    
+    div.innerHTML = `
+        <div style="flex: 1;">
+            <textarea class="q-text" rows="3" placeholder="Enter question text here..." style="width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-size: 14px; font-family: inherit; resize: vertical;">${escapeHtml(questionObj ? questionObj.questionText : '')}</textarea>
+        </div>
+        <div style="width: 100px;">
+            <input type="number" class="q-marks" placeholder="Marks" min="1" value="${questionObj ? questionObj.maxMarks : ''}" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-size: 14px;">
+        </div>
+        <button onclick="this.closest('.question-entry-item').remove()" style="background: none; border: none; color: #ef4444; font-size: 18px; cursor: pointer; padding: 8px;"><i class="fas fa-trash"></i></button>
+    `;
+    container.appendChild(div);
+}
+
+async function saveExamQuestions() {
+    const timetableId = document.getElementById('manage-questions-timetable-id').value;
+    const items = document.querySelectorAll('.question-entry-item');
+    
+    const questions = [];
+    let valid = true;
+    
+    items.forEach(item => {
+        const text = item.querySelector('.q-text').value.trim();
+        const marks = parseInt(item.querySelector('.q-marks').value, 10);
+        
+        if (text && !isNaN(marks) && marks > 0) {
+            questions.push({ questionText: text, maxMarks: marks });
+        } else if (text || (!isNaN(marks) && marks > 0)) {
+            valid = false;
+        }
+    });
+
+    if (!valid) {
+        showToast("Please ensure all questions have both text and valid marks.", "warning");
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/teacher/questions/${timetableId}`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ questions })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast("Questions saved successfully!", "success");
+            closeManageQuestionsModal();
+            fetchTeacherExamTimetable();
+        } else {
+            showToast(result.message || "Failed to save questions", "error");
+        }
+    } catch (error) {
+        console.error('Error saving questions:', error);
+        showToast("Connection error while saving questions", "error");
+    }
+}
+
+// ---------------------------
+// Text Answers Evaluation
+// ---------------------------
+
+function openEvaluateTextModal(timetableId, studentId, studentName) {
+    const studentData = window.currentGradingData.find(s => s.studentId === studentId);
+    if (!studentData) return;
+
+    // We must fetch questions for this timetable too to match `questionId` to `questionText`
+    // Since we don't have them in `studentData`, let's make a quick API call to get the timetable 
+    // Wait, the easiest is to just call `/api/students/me/exam-questions/${timetableId}`? Teacher can't call student route.
+    // Let's call `/api/exams/teacher/timetable` and extract questions.
+    
+    const container = document.getElementById('evaluation-questions-container');
+    container.innerHTML = `<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
+    
+    document.getElementById('evaluation-submission-id').value = studentId;
+    document.getElementById('evaluation-modal').dataset.timetableId = timetableId;
+    
+    document.getElementById('evaluation-marks').value = studentData.marks !== null ? studentData.marks : '';
+    document.getElementById('evaluation-total-marks').value = studentData.totalMarks || 100;
+    document.getElementById('evaluation-feedback').value = studentData.feedback || '';
+    
+    document.getElementById('evaluation-submission-info').innerHTML = `
+        <div style="margin-bottom: 5px;"><strong>Student:</strong> ${studentName}</div>
+    `;
+    
+    document.getElementById('evaluation-modal').style.display = 'flex';
+    
+    // Fetch questions to map IDs
+    const token = localStorage.getItem('token');
+    fetch('/api/exams/teacher/timetable', { headers: { 'Authorization': `Bearer ${token}` } })
+    .then(r => r.json())
+    .then(res => {
+        const timetable = res.data.find(t => t._id === timetableId);
+        const questions = timetable ? timetable.questions : [];
+        
+        if (!questions || questions.length === 0) {
+            container.innerHTML = `<div style="color: red;">Questions not found for this exam.</div>`;
+            return;
+        }
+
+        container.innerHTML = studentData.answers.map(ans => {
+            const q = questions.find(qu => qu._id.toString() === ans.questionId);
+            const qText = q ? escapeHtml(q.questionText) : 'Unknown Question';
+            const maxM = q ? q.maxMarks : 0;
+            const givenM = ans.marksGiven !== null ? ans.marksGiven : '';
+            
+            return `
+                <div class="eval-q-item" data-question-id="${ans.questionId}" style="background: white; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+                    <div style="font-weight: 600; color: #1e293b; margin-bottom: 8px; font-size: 14px;">${qText}</div>
+                    <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #f1f5f9; color: #475569; font-size: 14px; margin-bottom: 12px; white-space: pre-wrap;">${escapeHtml(ans.answerText)}</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" class="q-mark-input" value="${givenM}" min="0" max="${maxM}" placeholder="Marks" style="width: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; font-weight: 600;" oninput="recalcTotalMarks()">
+                        <span style="font-size: 13px; color: #64748b;">/ ${maxM}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        recalcTotalMarks();
+    });
+}
+
+function recalcTotalMarks() {
+    let total = 0;
+    document.querySelectorAll('.q-mark-input').forEach(input => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val)) total += val;
+    });
+    document.getElementById('evaluation-marks').value = total;
+}
+
+function closeEvaluationModal() {
+    document.getElementById('evaluation-modal').style.display = 'none';
+}
+
+async function saveEvaluation(action) {
+    const studentId = document.getElementById('evaluation-submission-id').value;
+    const timetableId = document.getElementById('evaluation-modal').dataset.timetableId;
+    
+    const items = document.querySelectorAll('.eval-q-item');
+    const marksData = [];
+    
+    items.forEach(item => {
+        const qId = item.dataset.questionId;
+        const val = item.querySelector('.q-mark-input').value;
+        marksData.push({
+            questionId: qId,
+            marksGiven: val === '' ? null : Number(val)
+        });
+    });
+    
+    const feedback = document.getElementById('evaluation-feedback').value.trim();
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/teacher/evaluate-answers/${timetableId}`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                studentId,
+                marksData,
+                feedback,
+                action: action // "save" or "publish"
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast("Evaluation saved successfully!", "success");
+            closeEvaluationModal();
+            // Optional: refresh the grading sheet or update UI visually
+            const row = document.querySelector(`.student-mark-row[data-student-id="${studentId}"]`);
+            if (row) {
+                row.querySelector('.mark-input').value = document.getElementById('evaluation-marks').value;
+                row.querySelector('.feedback-input').value = feedback;
+            }
+        } else {
+            showToast(result.message || "Failed to save evaluation", "error");
+        }
+    } catch (error) {
+        console.error('Error saving evaluation:', error);
+        showToast("Connection error", "error");
+    }
+}
+

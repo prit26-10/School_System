@@ -454,7 +454,12 @@ function loadPage(page, titleOverride = null) {
         'exam-timetable': {
             title: 'Create Exam Timetable',
             subtitle: 'Schedule exam timings',
-            render: renderExamTimetable
+        'exam-timetable': {
+            title: 'Create Exam Timetable',
+            subtitle: 'Schedule exam timings',
+            render: renderExamTimetable,
+            init: initializeExamTimetable
+        },
         },
         'exam-notification': {
             title: 'Send Exam Notification',
@@ -6263,3 +6268,453 @@ function generatePaymentReportPDF(students, filters) {
     const timestamp = new Date().getTime();
     doc.save(`Fee_Payment_Report_${timestamp}.pdf`);
 }
+// ============================================
+// EXAM TIMETABLE MANAGEMENT
+// ============================================
+
+function renderExamTimetable() {
+    return `
+        <div class="exam-timetable-container">
+            <div class="setup-grid">
+                <!-- Selection Card -->
+                <div class="selection-card">
+                    <div class="card-title">
+                        <i class="fas fa-cog"></i> Configure Schedule
+                    </div>
+                    <div class="form-group">
+                        <label for="exam-title-input">Exam Title</label>
+                        <input type="text" id="exam-title-input" class="form-control" placeholder="Enter Exam Title" required onkeyup="refreshTimetableGrid()">
+                    </div>
+                    <div class="form-group">
+                        <label for="exam-class-select">Class</label>
+                        <select id="exam-class-select" class="form-control" onchange="handleClassChange()">
+                            <option value="">Select Class</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Scheduling Form -->
+                <div class="selection-card">
+                    <div class="card-title">
+                        <i class="fas fa-calendar-plus"></i> Add Entry
+                    </div>
+                    <form id="exam-schedule-form" onsubmit="addExamTimetableEntry(event)">
+                        <div class="form-group">
+                            <label for="exam-subject-select">Subject</label>
+                            <select id="exam-subject-select" class="form-control" required>
+                                <option value="">Select Subject</option>
+                            </select>
+                        </div>
+                        <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group">
+                                <label for="exam-date">Date</label>
+                                <input type="date" id="exam-date" class="form-control" min="${getLocalDateString(new Date())}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="exam-duration">Duration (Mins)</label>
+                                <input type="number" id="exam-duration" class="form-control" placeholder="e.g. 180" required>
+                            </div>
+                        </div>
+                        <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group">
+                                <label for="exam-start-time">Start Time</label>
+                                <input type="time" id="exam-start-time" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="exam-end-time">End Time</label>
+                                <input type="time" id="exam-end-time" class="form-control" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-schedule">
+                            <i class="fas fa-plus"></i> Add to Timetable
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Visualization Card -->
+            <div class="timetable-view-card">
+                <div class="view-header">
+                    <h3><i class="fas fa-table"></i> Class Timetable</h3>
+                    <div class="view-actions" style="display: flex; gap: 10px; align-items: center;">
+                        <div id="selection-status" class="current-selection-info">Please select exam and class</div>
+                        <button class="btn btn-primary" onclick="exportTimetablePDF()" style="padding: 8px 15px; font-size: 0.8rem;">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="exam-table-wrapper">
+                    <table class="exam-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Subject</th>
+                                <th>Time</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exam-timetable-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">
+                                    No data to display. Select exam and class above.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function initializeExamTimetable() {
+    try {
+        AppState.isLoading = true;
+        const token = localStorage.getItem('token');
+        
+        // Fetch Exams
+        const examResponse = await fetch('/api/exams', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const examResult = await examResponse.json();
+        
+        // Fetch Classes
+        const classResponse = await fetch('/api/class-subjects/classes', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const classResult = await classResponse.json();
+        
+        console.log('Class Result:', classResult);
+
+        // Exam Periods fetching removed as it's now input title
+        // Populating Class Select
+        const classSelect = document.getElementById('exam-class-select');
+        if (classSelect) {
+            if (classResult.success && Array.isArray(classResult.data)) {
+                classSelect.innerHTML = '<option value="">Select Class</option>' + 
+                    classResult.data.map(cls => `<option value="${cls.class}">${cls.name}</option>`).join('');
+                AppState.allClasses = classResult.data;
+            } else {
+                classSelect.innerHTML = '<option value="">No Classes Found</option>';
+            }
+        }
+
+        AppState.isLoading = false;
+    } catch (error) {
+        console.error('Error initializing exam timetable:', error);
+        showToast('Error loading initial data', 'error');
+    }
+}
+
+function handleExamChange() {
+    refreshTimetableGrid();
+}
+
+function handleClassChange() {
+    const classId = document.getElementById('exam-class-select').value;
+    const subjectSelect = document.getElementById('exam-subject-select');
+    
+    if (classId && subjectSelect) {
+        const selectedClass = AppState.allClasses.find(c => c.class == classId);
+        if (selectedClass && selectedClass.subjects) {
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>' + 
+                selectedClass.subjects.map(s => `<option value="${s.code}">${s.name}</option>`).join('');
+        }
+    } else if (subjectSelect) {
+        subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+    }
+    refreshTimetableGrid();
+}
+
+async function refreshTimetableGrid() {
+    const examTitleInput = document.getElementById('exam-title-input');
+    const examId = examTitleInput ? examTitleInput.value : '';
+    const classId = document.getElementById('exam-class-select').value;
+    const tbody = document.getElementById('exam-timetable-body');
+    const statusInfo = document.getElementById('selection-status');
+    
+    if (!examId || !classId) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">No data to display. Select exam and class above.</td></tr>';
+        statusInfo.textContent = 'Please select exam and class';
+        return;
+    }
+    
+    statusInfo.textContent = `Viewing schedule for Class ${classId}`;
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/admin/${examId}/timetable/${classId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data.length > 0) {
+            tbody.innerHTML = result.data.map(entry => `
+                <tr>
+                    <td>
+                        <div class="entry-date">
+                            <span>${formatDate(entry.date)}</span>
+                            <span class="day">${moment(entry.date).format('dddd')}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <strong>${entry.subjectName}</strong>
+                        <div class="code" style="font-size: 0.8rem; color: #95a5a6;">${entry.subjectCode}</div>
+                    </td>
+                    <td>
+                        <div class="entry-time">
+                            <i class="far fa-clock"></i> ${entry.startTime} - ${entry.endTime}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="duration-badge">${entry.duration} Mins</span>
+                    </td>
+                    <td>
+                        <button class="btn-delete-entry" onclick="deleteExamTimetableEntry('${entry._id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">No exams scheduled for this selection.</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error fetching timetable:', error);
+        showToast('Error loading schedule', 'error');
+    }
+}
+
+async function addExamTimetableEntry(event) {
+    event.preventDefault();
+    
+    const examTitleInput = document.getElementById('exam-title-input');
+    const examTitle = examTitleInput ? examTitleInput.value : '';
+    const classId = document.getElementById('exam-class-select').value;
+    
+    if (!examTitle || !classId) {
+        showToast('Please enter Exam Title and select Class first', 'warning');
+        return;
+    }
+    
+    const subjectSelect = document.getElementById('exam-subject-select');
+    
+    const formData = {
+        examTitle,
+        class: parseInt(classId),
+        subjectName: subjectSelect.options[subjectSelect.selectedIndex].text,
+        subjectCode: subjectSelect.value,
+        date: document.getElementById('exam-date').value,
+        duration: parseInt(document.getElementById('exam-duration').value),
+        startTime: document.getElementById('exam-start-time').value,
+        endTime: document.getElementById('exam-end-time').value
+    };
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/admin/timetable', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('Entry added successfully', 'success');
+            document.getElementById('exam-schedule-form').reset();
+            refreshTimetableGrid();
+        } else {
+            showToast(result.message || 'Failed to add entry', 'error');
+        }
+    } catch (error) {
+        console.error('Error adding entry:', error);
+        showToast('Internal Server Error', 'error');
+    }
+}
+
+async function deleteExamTimetableEntry(id) {
+    if (!confirm('Are you sure you want to delete this schedule entry?')) return;
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/admin/timetable/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('Deleted successfully', 'success');
+            refreshTimetableGrid();
+        } else {
+            showToast('Failed to delete', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting entry:', error);
+        showToast('Error connecting to server', 'error');
+    }
+}
+
+function exportTimetablePDF() {
+    const element = document.querySelector('.timetable-view-card');
+    const examName = document.getElementById('exam-period-select').options[document.getElementById('exam-period-select').selectedIndex].text;
+    const className = document.getElementById('exam-class-select').options[document.getElementById('exam-class-select').selectedIndex].text;
+    
+    if (!examName || !className) {
+        showToast('Please select Exam and Class to export', 'warning');
+        return;
+    }
+
+    const opt = {
+        margin: 10,
+        filename: `Exam_Timetable_${className}_${examName}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+}
+
+// ============================================
+// PUBLISH RESULTS MODULE
+// ============================================
+
+function renderPublishResults() {
+    return `
+        <div class="dashboard-header" style="margin-bottom: 24px;">
+            <h2>Publish Results</h2>
+            <p style="color: var(--gray);">Review evaluated exams and publish results to students.</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="applications-header" style="margin-bottom: 20px;">
+                <h3 style="font-size: 1.1rem; color: var(--dark-blue);"><i class="fas fa-check-double"></i> Pending Approvals</h3>
+                <button class="btn-refresh" onclick="fetchEvaluatedExams()" style="background: none; border: none; color: var(--primary-blue); cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <i class="fas fa-sync-alt"></i> Refresh List
+                </button>
+            </div>
+            
+            <div id="publish-results-loading" style="display: none; padding: 40px; text-align: center;">
+                <div class="loading-spinner" style="margin: 0 auto;"></div>
+                <p style="margin-top: 15px; color: var(--gray);">Fetching evaluated exams...</p>
+            </div>
+            
+            <div id="publish-results-empty" style="display: none; padding: 60px 20px; text-align: center;">
+                <i class="fas fa-clipboard-check" style="font-size: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
+                <h3 style="color: var(--dark-blue); margin-bottom: 8px;">No Exams to Publish</h3>
+                <p style="color: var(--gray);">All evaluated exams have been published or no evaluations are pending.</p>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="publish-results-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>EXAM</th>
+                            <th>CLASS</th>
+                            <th>SUBJECT</th>
+                            <th>DATE</th>
+                            <th>EVALUATED</th>
+                            <th>ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="publish-results-tbody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+async function fetchEvaluatedExams() {
+    const loading = document.getElementById('publish-results-loading');
+    const empty = document.getElementById('publish-results-empty');
+    const table = document.getElementById('publish-results-table');
+    const tbody = document.getElementById('publish-results-tbody');
+    
+    if(!tbody) return;
+
+    loading.style.display = 'block';
+    empty.style.display = 'none';
+    table.style.display = 'none';
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/admin/evaluated-exams', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        loading.style.display = 'none';
+
+        if (result.success && result.data.length > 0) {
+            table.style.display = 'table';
+            tbody.innerHTML = result.data.map(exam => {
+                const isAllPublished = exam.submissions.every(s => s.status === 'published');
+                
+                return `
+                    <tr>
+                        <td style="font-weight: 500;">${exam.examName}</td>
+                        <td>Class ${exam.className}</td>
+                        <td>${exam.subjectName}</td>
+                        <td style="color: var(--gray);">${formatDate(exam.date)}</td>
+                        <td><span style="background: #eff6ff; color: #0A66FF; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${exam.evaluatedCount} Students</span></td>
+                        <td>
+                            ${isAllPublished ? 
+                                `<span style="color: #10b981; font-weight: 600; font-size: 0.9rem;"><i class="fas fa-check-circle"></i> Published</span>` :
+                                `<button onclick="publishResults('${exam.timetableId}')" style="background: var(--primary-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+                                    <i class="fas fa-bullhorn"></i> Publish Marks
+                                </button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            empty.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error fetching evaluated exams:', error);
+        loading.style.display = 'none';
+        empty.style.display = 'block';
+        empty.innerHTML = '<h3>Error Loading Data</h3><p>Could not retrieve evaluated exams.</p>';
+    }
+}
+
+async function publishResults(timetableId) {
+    if(!confirm('Are you sure you want to publish these marks? This will make them visible to students.')) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/admin/publish-results/${timetableId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast(result.message, 'success');
+            fetchEvaluatedExams();
+        } else {
+            showToast(result.message || 'Failed to publish results', 'error');
+        }
+    } catch (error) {
+        console.error('Error publishing results:', error);
+        showToast('Connection error', 'error');
+    }
+}
+
+// Hook into page load for publish-results
+const originalLoadPage = loadPage;
+loadPage = function(page, titleOverride = null) {
+    originalLoadPage(page, titleOverride);
+    if (page === 'publish-results') {
+        fetchEvaluatedExams();
+    }
+};

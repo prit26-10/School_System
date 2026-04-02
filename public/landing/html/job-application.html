@@ -511,8 +511,10 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Redirect to success page with actual application ID
-                    window.location.href = '/landing/application-success?id=' + result.applicationId;
+                    showSuccessModal(result.applicationId, applicationData);
+                    form.reset();
+                    submitBtn.innerHTML = 'Submit Application <i class="fas fa-arrow-right"></i>';
+                    submitBtn.disabled = false;
                 } else {
                     alert('Error submitting application: ' + result.message);
                     submitBtn.innerHTML = 'Submit Application <i class="fas fa-arrow-right"></i>';
@@ -525,6 +527,110 @@
                 submitBtn.disabled = false;
             }
         });
+
+        function showSuccessModal(appId, data) {
+            // Remove existing modal if any
+            const existingModal = document.getElementById('successModalOverlay');
+            if (existingModal) existingModal.remove();
+
+            const modalHtml = `
+                <div class="modal-overlay" id="successModalOverlay">
+                    <div class="success-modal">
+                        <div id="modalMainContent" class="modal-success-content">
+                            <div class="modal-icon">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <h2 class="modal-title">Application Submitted Successfully</h2>
+                            <div class="modal-app-id">Application ID: <span id="modalAppId">#${appId}</span></div>
+                            <div class="modal-buttons">
+                                <button class="modal-btn modal-btn-primary" id="viewApplicationBtn">
+                                    <i class="fas fa-eye"></i> View Application
+                                </button>
+                                <button class="modal-btn modal-btn-secondary" id="closeModalBtn">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="modalDetailsContent" class="modal-details-view">
+                            <h3 class="modal-title" style="font-size: 18px; margin-bottom: 20px;">Application Summary</h3>
+                            <div class="details-grid">
+                                <div class="details-item">
+                                    <span class="details-label">Applicant Name</span>
+                                    <span class="details-value">${data.fullName}</span>
+                                </div>
+                                <div class="details-item">
+                                    <span class="details-label">Position Applied</span>
+                                    <span class="details-value" style="text-transform: capitalize;">${data.position}</span>
+                                </div>
+                                <div class="details-item">
+                                    <span class="details-label">Department</span>
+                                    <span class="details-value" style="text-transform: capitalize;">${data.department || 'N/A'}</span>
+                                </div>
+                                <div class="details-item">
+                                    <span class="details-label">Contact Email</span>
+                                    <span class="details-value">${data.email}</span>
+                                </div>
+                                <div class="details-item">
+                                    <span class="details-label">Phone Number</span>
+                                    <span class="details-value">${data.phone}</span>
+                                </div>
+                                <div class="details-item">
+                                    <span class="details-label">Qualification</span>
+                                    <span class="details-value" style="text-transform: capitalize;">${data.qualification}</span>
+                                </div>
+                                <div class="details-item">
+                                    <span class="details-label">City</span>
+                                    <span class="details-value">${data.city}</span>
+                                </div>
+                            </div>
+                            <div class="modal-buttons" style="margin-top: 25px;">
+                                <button class="modal-btn modal-btn-secondary" id="backToSuccessBtn">
+                                    Back
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const overlay = document.getElementById('successModalOverlay');
+            const closeBtn = document.getElementById('closeModalBtn');
+            const viewAppBtn = document.getElementById('viewApplicationBtn');
+            const backBtn = document.getElementById('backToSuccessBtn');
+            const mainContent = document.getElementById('modalMainContent');
+            const detailsContent = document.getElementById('modalDetailsContent');
+
+            // Trigger animation
+            setTimeout(() => {
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden'; // Disable scroll
+            }, 10);
+
+            const closeModal = () => {
+                overlay.classList.remove('active');
+                document.body.style.overflow = ''; // Enable scroll
+                setTimeout(() => {
+                    overlay.remove();
+                }, 300);
+            };
+
+            viewAppBtn.addEventListener('click', () => {
+                mainContent.classList.add('hidden');
+                detailsContent.classList.add('active');
+            });
+
+            backBtn.addEventListener('click', () => {
+                detailsContent.classList.remove('active');
+                mainContent.classList.remove('hidden');
+            });
+
+            closeBtn.addEventListener('click', closeModal);
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) closeModal();
+            });
+        }
     </script>
 </body>
 

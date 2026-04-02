@@ -67,6 +67,10 @@
                                 <i class="fas fa-table"></i>
                                 <span>Exam Timetable</span>
                             </a>
+                            <a href="#" class="nav-item" data-page="attend-exam">
+                                <i class="fas fa-laptop-code"></i>
+                                <span>Attend Exam</span>
+                            </a>
                             <a href="#" class="nav-item" data-page="view-result">
                                 <i class="fas fa-poll"></i>
                                 <span>View My Result</span>
@@ -545,13 +549,25 @@
                 </div>
 
                 <div id="page-exam-timetable" class="page-section">
-                    <div class="placeholder-page">
-                        <div class="placeholder-icon"><i class="fas fa-table"></i></div>
-                        <h3>Exam Timetable</h3>
-                        <p>View the schedule for upcoming examinations.</p>
+                    <div class="dashboard-card" style="background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow-x: auto;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; margin-bottom: 24px;">
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-table" style="color: var(--primary-blue);"></i> Exam Timetable
+                                </h3>
+                                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">View your upcoming examination schedule.</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="downloadStudentExamPDF()" style="padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; background: #2563eb; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-file-pdf"></i> Export PDF
+                            </button>
+                        </div>
+                        <div id="student-exam-timetable-container">
+                            <div class="loading-state" style="text-align: center; padding: 60px;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
+                                <p style="color: #64748b;">Loading exam timetable...</p>
+                            </div>
+                        </div>
                     </div>
-                </div>
-
                 <div id="page-upload-paper" class="page-section">
                     <div class="placeholder-page">
                         <div class="placeholder-icon"><i class="fas fa-file-upload"></i></div>
@@ -568,6 +584,54 @@
                     </div>
                 </div>
 
+                <div id="page-attend-exam" class="page-section">
+                    <div class="dashboard-card" style="background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; margin-bottom: 24px;">
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-laptop-code" style="color: var(--primary-blue);"></i> Available Exams
+                                </h3>
+                                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Access and take your scheduled online examinations here.</p>
+                            </div>
+                            <button class="btn btn-secondary" onclick="loadAvailableExams()" style="padding: 10px 15px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc;">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                        </div>
+                        <div id="available-exams-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                            <div class="loading-state" style="text-align: center; padding: 60px; grid-column: 1 / -1;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
+                                <p style="color: #64748b;">Loading available exams...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exam Form Modal -->
+                <div id="exam-form-modal" class="modal" style="display: none; z-index: 1050;">
+                    <div class="modal-content" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; border-radius: 16px; padding: 0;">
+                        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px 30px; display: flex; justify-content: space-between; align-items: center; color: white;">
+                            <div>
+                                <h2 id="exam-form-subject" style="margin: 0; font-size: 20px; font-weight: 700; color: white;">Subject Name</h2>
+                                <p id="exam-form-title" style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.8; color: white;">Exam Title</p>
+                            </div>
+                            <!-- Removed auto-close button to prevent accidental closing during exam -->
+                        </div>
+                        
+                        <div id="exam-questions-container" style="padding: 30px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                            <div class="loading-state" style="text-align: center; padding: 60px;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
+                                <p style="color: #64748b;">Loading questions...</p>
+                            </div>
+                        </div>
+                        
+                        <div style="padding: 20px 30px; background: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 15px;">
+                            <button class="btn btn-secondary" onclick="closeExamFormModal()" style="border: 1px solid #e2e8f0; font-weight: 600;">Cancel</button>
+                            <button id="submit-exam-btn" class="btn btn-primary" onclick="submitExamAnswers()" style="background: #2563eb; color: white; border: none; font-weight: 600;">
+                                <i class="fas fa-paper-plane" style="margin-right: 8px;"></i> Submit Exam
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div id="page-view-result" class="page-section">
                     <div class="placeholder-page">
                         <div class="placeholder-icon"><i class="fas fa-poll"></i></div>
@@ -895,6 +959,8 @@
         <div class="toast-message" id="toast-message">Notification message here</div>
         <button class="toast-close" onclick="hideToast()"><i class="fas fa-times"></i></button>
     </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script src="/reset-password/reset-password.js"></script>
     <script src="/student/js/studentDashboard.js"></script>

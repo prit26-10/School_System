@@ -250,6 +250,12 @@ function loadPageData(pageId) {
         case 'view-results':
             loadResults();
             break;
+        case 'exam-timetable':
+            loadStudentExamTimetable();
+            break;
+        case 'attend-exam':
+            loadAvailableExams();
+            break;
     }
 }
 
@@ -1137,9 +1143,9 @@ function startLiveSessionsPolling() {
             // Check if we are still on dashboard or join-session page before loading
             const dashboardActive = document.getElementById('page-dashboard')?.classList.contains('active');
             const joinActive = document.getElementById('page-join-session')?.classList.contains('active');
-            
+
             if (dashboardActive) {
-                loadTodaySchedule(); 
+                loadTodaySchedule();
             } else if (joinActive) {
                 loadLiveSessions(true);
             } else {
@@ -1809,11 +1815,6 @@ window.logout = function () {
 
 window.handleLogout = window.logout;
 
-// Placeholder functions for missing HTML interaction handlers
-window.tcNavigateMonth = function (dir) {
-    console.log('Navigate month:', dir);
-    // Future: implement full calendar logic
-};
 
 window.loadTeacherAnnouncements = function () {
     loadAnnouncements();
@@ -1836,9 +1837,415 @@ window.sortAssignedClasses = function () {
     console.log('Sorting classes...');
 };
 
+
+/**
+ * Utility to escape HTML and prevent XSS
+ */
 function escapeHtml(text) {
-    if (!text) return '';
+    if (text === undefined || text === null) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text.toString();
     return div.innerHTML;
+}
+
+/**
+ * High-fidelity rendering of the student's exam timetable
+ * Groups entries by exam and provides a clean, professional tabular layout.
+ */
+async function loadStudentExamTimetable() {
+    const container = document.getElementById('student-exam-timetable-container');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="text-align: center; padding: 60px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
+            <p style="color: #64748b;">Loading your examination schedule...</p>
+        </div>
+    `;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/student/timetable', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const result = await response.json();
+
+        if (!result.success || !result.data || result.data.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 60px; color: #94a3b8;">
+                    <div style="width: 64px; height: 64px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                        <i class="fas fa-calendar-times" style="font-size: 28px; color: #cbd5e1;"></i>
+                    </div>
+                    <h3 style="color: #1e293b; font-size: 18px; margin-bottom: 8px;">No Exams Scheduled</h3>
+                    <p style="font-size: 14px;">Great news! You have no upcoming examinations at this time.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const timetable = result.data;
+        const exams = result.exams || [];
+
+        // Group by exam
+        const grouped = {};
+        timetable.forEach(entry => {
+            const examId = entry.examId?._id || entry.examId;
+            if (!grouped[examId]) grouped[examId] = [];
+            grouped[examId].push(entry);
+        });
+
+        let html = '<div id="student-exam-pdf-content">';
+
+        for (const examId in grouped) {
+            const examInfo = exams.find(e => e._id === examId) ||
+                (timetable.find(t => (t.examId?._id || t.examId) === examId)?.examId) ||
+                { name: 'Examination' };
+
+            const entries = grouped[examId];
+
+            html += `
+                <div class="exam-group" style="margin-bottom: 40px; background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="margin: 0; color: #0f172a; font-size: 18px; font-weight: 700;">${escapeHtml(examInfo.name)}</h4>
+                            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px; font-weight: 500;">
+                                <i class="fas fa-graduation-cap" style="margin-right: 6px;"></i>Academic Session ${escapeHtml(examInfo.academicYear)}
+                            </p>
+                        </div>
+                        <div style="background: #eff6ff; color: #2563eb; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid #dbeafe;">
+                            Upcoming
+                        </div>
+                    </div>
+                    
+                    <div class="exam-pdf-header" style="text-align: center; margin-bottom: 25px; padding: 20px; border-bottom: 2px solid #f1f5f9; display: none;">
+                        <h1 style="color: #1e293b; margin: 0; font-size: 24px;">SmartSchool</h1>
+                        <h2 style="color: #64748b; margin: 5px 0 0 0; font-size: 18px;">${escapeHtml(examInfo.name)} Timetable</h2>
+                        <p style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Student: ${escapeHtml(currentUser.name)} | Class: ${escapeHtml(currentUser.class || currentUser.studentData?.class)}</p>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #fafafa;">
+                                    <th style="padding: 16px 24px; text-align: left; font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0;">Date & Day</th>
+                                    <th style="padding: 16px 24px; text-align: left; font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0;">Subject</th>
+                                    <th style="padding: 16px 24px; text-align: left; font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0;">Timing</th>
+                                    <th style="padding: 16px 24px; text-align: left; font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0;">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            entries.forEach((entry, idx) => {
+                const dateObj = new Date(entry.date);
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+                const dateDisplay = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+
+                html += `
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;">
+                        <td style="padding: 18px 24px;">
+                            <div style="font-weight: 700; color: #1e293b; font-size: 14.5px;">${dateDisplay}</div>
+                            <div style="color: #64748b; font-size: 12px; font-weight: 500;">${dayName}</div>
+                        </td>
+                        <td style="padding: 18px 24px;">
+                            <div style="font-weight: 700; color: #2563eb; font-size: 15px;">${escapeHtml(entry.subjectName)}</div>
+                            <div style="color: #94a3b8; font-size: 12px;">Code: ${escapeHtml(entry.subjectCode)}</div>
+                        </td>
+                        <td style="padding: 18px 24px;">
+                            <span style="background: #f1f5f9; color: #334155; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid #e2e8f0; display: inline-flex; align-items: center; gap: 8px;">
+                                <i class="far fa-clock" style="color: #64748b;"></i>${entry.startTime} - ${entry.endTime}
+                            </span>
+                        </td>
+                        <td style="padding: 18px 24px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></div>
+                                <span style="font-size: 14px; font-weight: 600; color: #475569;">${entry.duration} Mins</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="padding: 16px 24px; background: #fafafa; border-top: 1px solid #f1f5f9; text-align: center;">
+                        <p style="margin: 0; color: #94a3b8; font-size: 12px;">Bring your identification card and arrive 15 minutes before the start time.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error("Error loading exam timetable:", error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 60px; color: #ef4444;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 16px;"></i>
+                <p>Failed to load the examination schedule. Please refresh the page.</p>
+            </div>
+        `;
+    }
+}
+
+function downloadStudentExamPDF() {
+    const element = document.getElementById('student-exam-pdf-content');
+    if (!element) {
+        showToast('No timetable found to export', 'warning');
+        return;
+    }
+
+    // Temporarily show headers inside each exam group for PDF
+    const groups = element.querySelectorAll('.exam-group');
+    groups.forEach(group => {
+        const header = group.querySelector('.exam-pdf-header');
+        if (header) header.style.display = 'block';
+    });
+
+    const opt = {
+        margin: 10,
+        filename: `Exam_Timetable_${currentUser.class || currentUser.studentData?.class || 'Class'}_${currentUser.name || 'Student'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    if (typeof html2pdf !== 'undefined') {
+        html2pdf().set(opt).from(element).save().then(() => {
+            groups.forEach(group => {
+                const header = group.querySelector('.exam-pdf-header');
+                if (header) header.style.display = 'none';
+            });
+        });
+    } else {
+        // Fallback or script loading
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        script.onload = () => {
+            html2pdf().set(opt).from(element).save().then(() => {
+                groups.forEach(group => {
+                    const header = group.querySelector('.exam-pdf-header');
+                    if (header) header.style.display = 'none';
+                });
+            });
+        };
+        document.head.appendChild(script);
+    }
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'TBA';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('notification-toast');
+    const msgEl = document.getElementById('toast-message');
+    if (!toast || !msgEl) return;
+
+    msgEl.textContent = message;
+    toast.className = `notification-toast visible ${type}`;
+
+    setTimeout(() => {
+        toast.className = 'notification-toast';
+    }, 4000);
+}
+
+// ────────────────────────────────────────────────
+// Attend Exam Logic
+// ────────────────────────────────────────────────
+
+let currentExamTimetableId = null;
+
+async function loadAvailableExams() {
+    const container = document.getElementById('available-exams-container');
+    if (!container) return;
+
+    container.innerHTML = `<div class="loading-state" style="text-align: center; padding: 60px; grid-column: 1 / -1;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
+        <p style="color: #64748b;">Loading available exams...</p>
+    </div>`;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/students/me/available-exams', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const result = await response.json();
+
+        if (!result.success || !Array.isArray(result.data) || result.data.length === 0) {
+            container.innerHTML = `<div style="text-align: center; padding: 40px; color: #94a3b8; grid-column: 1 / -1;">
+                <i class="fas fa-laptop-code" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                <p>No exams currently available to attend.</p>
+            </div>`;
+            return;
+        }
+
+        container.innerHTML = result.data.map(exam => `
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">${escapeHtml(exam.subjectName)}</h4>
+                        ${exam.isSubmitted
+                ? `<span style="background: #ecfdf5; color: #047857; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #d1fae5;">Submitted</span>`
+                : `<span style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #bae6fd;">Available</span>`
+            }
+                    </div>
+                    <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b;">Exam: <strong>${escapeHtml(exam.examName)}</strong></p>
+                    <div style="font-size: 12.5px; color: #475569; margin-bottom: 16px; background: #f8fafc; padding: 12px; border-radius: 8px;">
+                        <div><strong>Date:</strong> ${new Date(exam.date).toLocaleDateString()}</div>
+                        <div style="margin-top: 4px;"><strong>Time:</strong> ${exam.startTime} - ${exam.endTime}</div>
+                        <div style="margin-top: 4px;"><strong>Duration:</strong> ${exam.duration} mins</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="openExamFormModal('${exam._id}')" ${exam.isSubmitted ? 'disabled' : ''} style="width: 100%; border-radius: 8px; font-weight: 600; padding: 10px; background: ${exam.isSubmitted ? '#cbd5e1' : '#2563eb'}; border: none; cursor: ${exam.isSubmitted ? 'not-allowed' : 'pointer'};">
+                    ${exam.isSubmitted ? '<i class="fas fa-check"></i> Already Submitted' : '<i class="fas fa-pen-alt"></i> Attend Exam'}
+                </button>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error fetching available exams:', error);
+        container.innerHTML = `<div style="text-align: center; color: #ef4444; grid-column: 1 / -1; padding: 40px;">Error loading exams. Please try again later.</div>`;
+    }
+}
+
+async function openExamFormModal(timetableId) {
+    currentExamTimetableId = timetableId;
+    const modal = document.getElementById('exam-form-modal');
+    const container = document.getElementById('exam-questions-container');
+
+    if (modal) modal.style.display = 'flex';
+    container.innerHTML = `<div class="loading-state" style="text-align: center; padding: 60px;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
+        <p style="color: #64748b;">Loading questions...</p>
+    </div>`;
+
+    document.getElementById('submit-exam-btn').disabled = true;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/students/me/exam-questions/${timetableId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+            container.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 40px;">${result.message || 'Error loading questions.'}</div>`;
+            return;
+        }
+
+        document.getElementById('exam-form-subject').textContent = result.data.subjectName;
+        document.getElementById('exam-form-title').textContent = result.data.examName;
+
+        const questions = result.data.questions || [];
+        if (questions.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: #94a3b8; padding: 40px;">No questions defined for this exam.</div>`;
+            return;
+        }
+
+        container.innerHTML = questions.map((q, idx) => `
+            <div class="exam-question-item" data-id="${q._id}" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b; line-height: 1.5;">${idx + 1}. ${escapeHtml(q.questionText)}</h5>
+                    <span style="font-size: 12px; font-weight: 600; color: #3b82f6; background: #eff6ff; padding: 4px 8px; border-radius: 6px; white-space: nowrap; margin-left: 12px;">${q.maxMarks} Marks</span>
+                </div>
+                <textarea class="exam-answer-input" data-id="${q._id}" rows="5" placeholder="Type your answer here..." style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; margin-top: 8px;" required></textarea>
+            </div>
+        `).join('');
+
+        document.getElementById('submit-exam-btn').disabled = false;
+
+    } catch (error) {
+        console.error('Error fetching questions:', error);
+        container.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 40px;">Error loading questions.</div>`;
+    }
+}
+
+function closeExamFormModal() {
+    const modal = document.getElementById('exam-form-modal');
+    if (confirm("Are you sure you want to exit? Your answers will NOT be saved.")) {
+        if (modal) modal.style.display = 'none';
+        currentExamTimetableId = null;
+    }
+}
+
+async function submitExamAnswers() {
+    if (!currentExamTimetableId) return;
+
+    const answerInputs = document.querySelectorAll('.exam-answer-input');
+    const answers = [];
+
+    // Validate that all questions have at least some text
+    let allFilled = true;
+    answerInputs.forEach(input => {
+        const text = input.value.trim();
+        if (!text) {
+            allFilled = false;
+        }
+        answers.push({
+            questionId: input.getAttribute('data-id'),
+            answerText: text
+        });
+    });
+
+    if (!allFilled) {
+        if (!confirm("You have left some answers blank. Are you sure you want to submit?")) {
+            return;
+        }
+    }
+
+    const btn = document.getElementById('submit-exam-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Submitting...`;
+    btn.disabled = true;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/students/me/submit-exam/${currentExamTimetableId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ answers })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast("Exam submitted successfully!", "success");
+            const modal = document.getElementById('exam-form-modal');
+            if (modal) modal.style.display = 'none';
+            currentExamTimetableId = null;
+            loadAvailableExams(); // Refresh grid
+        } else {
+            showToast(result.message || "Failed to submit exam", "error");
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+
+    } catch (error) {
+        console.error('Error submitting exam:', error);
+        showToast("Error submitting exam.", "error");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 }
