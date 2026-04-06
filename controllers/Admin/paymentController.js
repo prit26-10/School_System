@@ -97,7 +97,7 @@ exports.getStudentsWithPayments = async (req, res) => {
         total_fees: totalFees,
         paid_amount: paidAmount,
         status: paymentStatus,
-        due_date: dueDate,
+        payment_date: payment ? payment.lastPaymentDate : null,
         class_id: student.classInfo._id
       });
     }
@@ -141,8 +141,9 @@ exports.getFeesCollectionOverview = async (req, res) => {
     for (const student of studentsWithPayments) {
       totalExpected += student.total_fees;
       totalCollected += student.paid_amount;
-      totalPending += (student.total_fees - student.paid_amount);
     }
+    
+    totalPending = totalExpected - totalCollected;
     
     // Calculate collection rate
     const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
@@ -354,9 +355,9 @@ exports.updateStudentPayment = async (req, res) => {
         classId: classSubject._id,
         totalFees,
         paidAmount: totalFees, // Full payment
-        dueAmount: 0, // No due amount
         paymentStatus: "paid", // Mark as paid
         dueDate: new Date(),
+        lastPaymentDate: new Date(),
         academicYear: new Date().getFullYear().toString(),
         paymentHistory: [{
           amount: totalFees,
@@ -369,8 +370,8 @@ exports.updateStudentPayment = async (req, res) => {
     } else {
       // Update existing payment to full payment
       payment.paidAmount = totalFees;
-      payment.dueAmount = 0;
       payment.paymentStatus = "paid";
+      payment.lastPaymentDate = new Date();
       payment.paymentHistory.push({
         amount: totalFees,
         paymentDate: new Date(),
@@ -382,6 +383,12 @@ exports.updateStudentPayment = async (req, res) => {
     
     // Save payment
     await payment.save();
+    
+    // Update user feesStatus
+    if (student && student.studentData) {
+      student.studentData.feesStatus = "paid";
+      await student.save();
+    }
     
     res.status(200).json({
       success: true,
@@ -492,9 +499,7 @@ exports.getAllStudentPayments = async (req, res) => {
         class: student.classInfo?.class || student.class || 'N/A',
         totalFees: payment.totalFees,
         paidAmount: payment.paidAmount,
-        dueAmount: payment.dueAmount,
         paymentStatus: payment.paymentStatus,
-        dueDate: payment.dueDate,
         lastPaymentDate: payment.lastPaymentDate,
         paymentHistory: payment.paymentHistory,
         academicYear: payment.academicYear,
@@ -594,7 +599,6 @@ exports.generateReceipt = async (req, res) => {
       class: payment.classId.class,
       totalFees: payment.totalFees,
       paidAmount: latestPayment.amount,
-      dueAmount: payment.dueAmount,
       paymentDate: latestPayment.paymentDate,
       receiptNumber: latestPayment.receiptNumber,
       paymentMethod: latestPayment.paymentMethod,
@@ -634,7 +638,6 @@ exports.generateBulkReceipts = async (req, res) => {
         class: payment.classId.class,
         totalFees: payment.totalFees,
         paidAmount: latestPayment.amount,
-        dueAmount: payment.dueAmount,
         paymentDate: latestPayment.paymentDate,
         receiptNumber: latestPayment.receiptNumber,
         paymentMethod: latestPayment.paymentMethod,
@@ -650,3 +653,43 @@ exports.generateBulkReceipts = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// @desc    Get admin receipt for a student
+// @route   GET /api/payments/admin-receipt/:studentId
+// @access  Admin
+exports.getAdminReceipt = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const payment = await StudentPayment.findOne({ studentId }).populate("classId");
+    
+    if (!payment || payment.paymentHistory.length === 0) {
+      return res.status(404).json({ success: false, message: "No payment history found for this student" });
+    }
+    
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    // Get latest payment
+    const latestPayment = payment.paymentHistory[payment.paymentHistory.length - 1];
+
+    res.status(200).json({
+      success: true,
+      data: {
+        studentName: student.name,
+        className: payment.classId ? (payment.classId.name || `Class ${payment.classId.class}`) : 'N/A',
+        totalFees: payment.totalFees,
+        paidAmount: latestPayment.amount,
+        paymentDate: latestPayment.paymentDate,
+        receiptNumber: latestPayment.receiptNumber,
+        paymentMethod: latestPayment.paymentMethod,
+        transactionId: latestPayment.razorpayPaymentId || 'N/A'
+      }
+    });
+  } catch (err) {
+    console.error("Get Admin Receipt Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+

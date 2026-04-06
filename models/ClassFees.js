@@ -8,14 +8,6 @@ const ClassFeesSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    tuitionFee: {
-      type: Number,
-      required: true,
-    },
-    examFee: {
-      type: Number,
-      required: true,
-    },
     totalFee: {
       type: Number,
       required: true,
@@ -27,6 +19,9 @@ const ClassFeesSchema = new mongoose.Schema(
     totalSubjects: {
       type: Number,
       default: 5,
+    },
+    description: {
+      type: String,
     },
   },
   { timestamps: true }

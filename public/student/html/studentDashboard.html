@@ -113,6 +113,14 @@
                     </a>
                 </div>
 
+                <!-- 7.5. My Fees -->
+                <div class="nav-section">
+                    <a href="#" class="nav-item" data-page="my-fees">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>My Fees</span>
+                    </a>
+                </div>
+
                 <!-- 8. Assignments -->
                 <div class="nav-section">
                     <div class="nav-group">
@@ -935,6 +943,50 @@
                         <p>Successfully conclude your live online class.</p>
                     </div>
                 </div>
+
+                <div id="page-my-fees" class="page-section">
+                    <div class="dashboard-card" style="max-width: 600px; margin: 0 auto; margin-top: 20px;">
+                        <div class="card-header">
+                            <h3><i class="fas fa-file-invoice-dollar"></i> Class Fees Detail</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="my-fees-loading" style="text-align: center; padding: 20px; color: #3b82f6;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                            </div>
+                            
+                            <div id="my-fees-content" style="display: none;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 15px;">
+                                    <div>
+                                        <h4 id="mf-student-name" style="margin: 0; color: #1e293b; font-size: 16px;">...</h4>
+                                        <span id="mf-class-name" style="color: #64748b; font-size: 13px;">...</span>
+                                    </div>
+                                    <div id="mf-status-badge" style="padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;"></div>
+                                </div>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #64748b; font-size: 14px;">
+                                        <span>Total Fees</span>
+                                        <strong id="mf-total-fees" style="color: #334155;">₹0</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px; color: #64748b; font-size: 14px;">
+                                        <span>Paid Amount</span>
+                                        <strong id="mf-paid-amount" style="color: #10b981;">₹0</strong>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; gap: 10px;" id="mf-actions">
+                                    <button id="mf-pay-btn" class="btn btn-primary" style="flex: 1; padding: 12px; background: #0A66FF; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: none;" onclick="initiateDashboardPayment()">
+                                        <i class="fas fa-credit-card"></i> Pay Now
+                                    </button>
+                                    <button id="mf-receipt-btn" class="btn btn-success" style="flex: 1; padding: 12px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: none;" onclick="downloadMyReceipt()">
+                                        <i class="fas fa-download"></i> Download Receipt
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -985,6 +1037,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
     <script src="/reset-password/reset-password.js"></script>
     <script src="/student/js/studentDashboard.js"></script>

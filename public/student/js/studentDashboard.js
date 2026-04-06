@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    if (userData.feesStatus === 'pending') {
+        window.location.href = '/student/fees-pending';
+        return;
+    }
+
     currentUser = userData;
 
     // Initialize UI with whatever is in localStorage first (fast paint)
@@ -256,6 +261,9 @@ function loadPageData(pageId) {
         case 'view-materials':
             loadStudyMaterials();
             break;
+        case 'my-fees':
+            loadMyFees();
+            break;
         case 'join-session':
             loadLiveSessions();
             startLiveSessionsPolling(); // Start polling
@@ -341,12 +349,12 @@ async function loadTodaySchedule() {
         // Sort chronologically (merge classes and exams)
         const combinedSchedule = [
             ...todayClasses.map(c => ({ ...c, type: 'class' })),
-            ...todayExams.map(e => ({ 
-                subjectName: e.subjectName, 
-                startTime: e.startTime, 
-                endTime: e.endTime, 
+            ...todayExams.map(e => ({
+                subjectName: e.subjectName,
+                startTime: e.startTime,
+                endTime: e.endTime,
                 type: 'exam',
-                examId: e._id 
+                examId: e._id
             }))
         ];
 
@@ -359,7 +367,7 @@ async function loadTodaySchedule() {
         const classNameDisplay = currentUser && currentUser.class ? `Class ${currentUser.class}` : 'Your Class';
 
         const numericClass = currentUser && (currentUser.class || currentUser.studentData?.class) ? (currentUser.class || currentUser.studentData?.class) : 'N/A';
- 
+
         container.innerHTML = combinedSchedule.map(item => {
             if (item.type === 'exam') {
                 return `
@@ -2154,7 +2162,7 @@ async function loadAvailableExams() {
             let btnColor = exam.isToday ? '#ef4444' : '#2563eb';
             let btnDisabled = false;
             let statusLabel = '';
-            
+
             if (exam.isSubmitted) {
                 statusLabel = `<span style="background: #ecfdf5; color: #047857; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #d1fae5;">Submitted</span>`;
                 btnText = '<i class="fas fa-check"></i> Already Submitted';
@@ -2247,9 +2255,9 @@ async function openExamFormModal(timetableId) {
 
         const questions = result.data.questions || [];
         const questionPaper = result.data.questionPaper;
-        
+
         let questionsHtml = '';
-        
+
         if (questionPaper) {
             questionsHtml += `
                 <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
@@ -2292,7 +2300,7 @@ async function openExamFormModal(timetableId) {
         }
 
         container.innerHTML = questionsHtml;
-        
+
         document.getElementById('submit-exam-btn').disabled = false;
 
     } catch (error) {
@@ -2363,7 +2371,6 @@ async function submitExamAnswers() {
             btn.innerHTML = originalText;
             btn.disabled = false;
         }
-
     } catch (error) {
         console.error('Error submitting exam:', error);
         showToast("Error submitting exam.", "error");
@@ -2378,7 +2385,7 @@ async function submitExamAnswers() {
 
 async function openOnlineExamZone(timetableId) {
     if (!timetableId) return;
-    
+
     // Redirect to the new dedicated exam environment
     // This ensures a clean, isolated session from the start
     window.location.href = `/exam/exam.html?id=${encodeURIComponent(timetableId)}`;
@@ -2514,16 +2521,16 @@ async function initiateExamStart() {
         // Step 2: Initialize Proctoring Observers
         document.addEventListener('fullscreenchange', handleFullscreenExitDetection);
         document.addEventListener('visibilitychange', handleVisibilityChangeDetection);
-        
+
         // Step 3: Setup UI for Exam mode
         document.body.classList.add('exam-mode-active');
         proctorState.isExamActive = true;
         proctorState.timeLeft = proctorState.duration * 60;
-        
+
         // Step 4: Render Questions & Start Timer
         startExamTimer();
         renderProctoredQuestions();
-        
+
         // Step 5: Setup Camera Monitoring
         startCameraMonitoring();
 
@@ -2677,13 +2684,13 @@ function handleVisibilityChangeDetection() {
 
 async function forceSubmitExam(reason) {
     if (!proctorState.isExamActive) return;
-    
+
     showToast(`${reason}. Submitting exam...`, "danger");
     proctorState.isExamActive = false;
-    
+
     // Stop all trackers
     cleanupProctoring();
-    
+
     // Auto-save whatever is filled
     submitProctoredExam(true, reason);
 }
@@ -2693,11 +2700,11 @@ function cleanupProctoring() {
     document.removeEventListener('fullscreenchange', handleFullscreenExitDetection);
     document.removeEventListener('visibilitychange', handleVisibilityChangeDetection);
     document.body.classList.remove('exam-mode-active');
-    
+
     if (proctorState.stream) {
         proctorState.stream.getTracks().forEach(track => track.stop());
     }
-    
+
     if (document.fullscreenElement) {
         document.exitFullscreen().catch(err => console.error(err));
     }
@@ -2722,7 +2729,7 @@ async function submitProctoredExam(isAuto = false, autoReason = "") {
     proctorState.isExamActive = false;
     const items = document.querySelectorAll('.online-question-item');
     const answers = [];
-    
+
     items.forEach(item => {
         const qId = item.dataset.id;
         const qType = item.dataset.type;
@@ -2748,11 +2755,11 @@ async function submitProctoredExam(isAuto = false, autoReason = "") {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/student/csv-submit-exam/${proctorState.timetableId}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 answers,
                 isAutoSubmission: isAuto,
                 submissionReason: autoReason || "Manual Submission"
@@ -2761,7 +2768,7 @@ async function submitProctoredExam(isAuto = false, autoReason = "") {
 
         const result = await response.json();
         cleanupProctoring();
-        
+
         if (result.success) {
             showToast(isAuto ? "Exam Auto-Submitted due to Security Policy" : "Exam successfully submitted!", isAuto ? "danger" : "success");
             const modal = document.getElementById('exam-form-modal');
@@ -2782,7 +2789,7 @@ async function submitOnlineExam(timetableId) {
 
     const items = document.querySelectorAll('.online-question-item');
     const answers = [];
-    
+
     let allAnswered = true;
     items.forEach(item => {
         const qId = item.dataset.id;
@@ -2813,7 +2820,7 @@ async function submitOnlineExam(timetableId) {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/student/csv-submit-exam/${timetableId}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
@@ -2847,7 +2854,7 @@ async function loadMyResults() {
     const loading = document.getElementById('student-results-loading');
     const empty = document.getElementById('student-results-empty');
     const container = document.getElementById('student-results-container');
-    
+
     if (!container) return;
 
     if (loading) loading.style.display = 'block';
@@ -2956,11 +2963,11 @@ async function loadMyResults() {
                                     </thead>
                                     <tbody>
                                         ${data.subjects.map(s => {
-                                            const perfVal = parseFloat(s.percentage);
-                                            const grade = perfVal >= 90 ? 'A+' : perfVal >= 80 ? 'A' : perfVal >= 70 ? 'B+' : perfVal >= 60 ? 'B' : perfVal >= 50 ? 'C' : perfVal >= 35 ? 'D' : 'E';
-                                            const perfColor = perfVal >= 80 ? '#10b981' : perfVal >= 60 ? '#3b82f6' : perfVal >= 40 ? '#f59e0b' : '#ef4444';
-                                            
-                                            return `
+                        const perfVal = parseFloat(s.percentage);
+                        const grade = perfVal >= 90 ? 'A+' : perfVal >= 80 ? 'A' : perfVal >= 70 ? 'B+' : perfVal >= 60 ? 'B' : perfVal >= 50 ? 'C' : perfVal >= 35 ? 'D' : 'E';
+                        const perfColor = perfVal >= 80 ? '#10b981' : perfVal >= 60 ? '#3b82f6' : perfVal >= 40 ? '#f59e0b' : '#ef4444';
+
+                        return `
                                                 <tr style="background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                                                     <td style="padding: 18px 20px; border-radius: 12px 0 0 12px; font-weight: 700; color: #334155;">${s.subjectName}</td>
                                                     <td style="padding: 18px 20px; text-align: center; color: #94a3b8; font-weight: 600;">${s.totalMaxMarks}</td>
@@ -2971,7 +2978,7 @@ async function loadMyResults() {
                                                     </td>
                                                 </tr>
                                             `;
-                                        }).join('')}
+                    }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -3000,5 +3007,264 @@ async function loadMyResults() {
                 </div>
             `;
         }
+    }
+}
+// My Fees Logic
+// ────────────────────────────────────────────────
+
+let dashboardPaymentDetails = null;
+
+async function loadMyFees() {
+    document.getElementById('my-fees-content').style.display = 'none';
+    document.getElementById('my-fees-loading').style.display = 'block';
+
+    const token = localStorage.getItem('token');
+
+    try {
+        const res = await fetch('/api/student-fees/status', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.status === 401 || res.status === 403) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const result = await res.json();
+
+        if (result.success && result.data) {
+            dashboardPaymentDetails = result.data;
+            renderMyFees(result.data);
+        } else {
+            document.getElementById('my-fees-loading').innerHTML =
+                `<span style="color:#ef4444;"><i class="fas fa-exclamation-triangle"></i> Failed to load fees details.</span>`;
+        }
+    } catch (err) {
+        console.error(err);
+        document.getElementById('my-fees-loading').innerHTML =
+            `<span style="color:#ef4444;"><i class="fas fa-exclamation-triangle"></i> Network Error.</span>`;
+    }
+}
+
+function renderMyFees(data) {
+    document.getElementById('my-fees-loading').style.display = 'none';
+    document.getElementById('my-fees-content').style.display = 'block';
+
+    document.getElementById('mf-student-name').textContent = data.studentName;
+    document.getElementById('mf-class-name').textContent = data.className;
+    document.getElementById('mf-total-fees').textContent = `₹${data.totalFees}`;
+    document.getElementById('mf-paid-amount').textContent = `₹${data.paidAmount}`;
+
+    const statusBadge = document.getElementById('mf-status-badge');
+    const payBtn = document.getElementById('mf-pay-btn');
+    const receiptBtn = document.getElementById('mf-receipt-btn');
+
+    if (data.feesStatus === 'paid' || (data.totalFees - data.paidAmount) <= 0) {
+        statusBadge.textContent = 'Paid';
+        statusBadge.style.background = '#dcfce7';
+        statusBadge.style.color = '#10b981';
+        payBtn.style.display = 'none';
+        receiptBtn.style.display = 'block';
+    } else {
+        statusBadge.textContent = 'Pending';
+        statusBadge.style.background = '#fee2e2';
+        statusBadge.style.color = '#ef4444';
+        payBtn.style.display = 'block';
+        receiptBtn.style.display = 'none';
+    }
+}
+
+async function initiateDashboardPayment() {
+    const btn = document.getElementById('mf-pay-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing...`;
+
+    const token = localStorage.getItem('token');
+
+    try {
+        const orderRes = await fetch('/api/student-fees/create-order', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const orderData = await orderRes.json();
+
+        if (!orderData.success) throw new Error(orderData.message || "Failed to create order");
+
+        const startOptions = {
+            key: orderData.data.keyId,
+            amount: orderData.data.amount,
+            currency: orderData.data.currency,
+            name: "Smart School System",
+            description: `Fees - ${dashboardPaymentDetails.className}`,
+            order_id: orderData.data.orderId,
+            handler: async function (response) {
+                await verifyDashboardPayment(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
+            },
+            prefill: {
+                name: orderData.data.studentName,
+                email: orderData.data.studentEmail,
+                contact: orderData.data.contact
+            },
+            theme: { color: "#0A66FF" },
+            modal: {
+                ondismiss: function () {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fas fa-credit-card"></i> Pay Now`;
+                }
+            }
+        };
+
+        const rzp = new Razorpay(startOptions);
+        rzp.open();
+
+    } catch (err) {
+        alert(err.message || 'Payment initiation failed');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-credit-card"></i> Pay Now`;
+    }
+}
+
+async function verifyDashboardPayment(orderId, paymentId, signature) {
+    const btn = document.getElementById('mf-pay-btn');
+    btn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Verifying...`;
+
+    const token = localStorage.getItem('token');
+
+    try {
+        const verifyRes = await fetch('/api/student-fees/verify-payment', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                razorpay_order_id: orderId,
+                razorpay_payment_id: paymentId,
+                razorpay_signature: signature
+            })
+        });
+
+        const result = await verifyRes.json();
+
+        if (result.success) {
+            let userData = JSON.parse(localStorage.getItem('userData') || '{}');
+            userData.feesStatus = 'paid';
+            localStorage.setItem('userData', JSON.stringify(userData));
+
+            btn.innerHTML = `<i class="fas fa-check"></i> Paid!`;
+            btn.style.background = "#10b981";
+
+            // Reload UI
+            setTimeout(loadMyFees, 1500);
+        } else {
+            throw new Error(result.message || "Payment verification failed");
+        }
+    } catch (err) {
+        alert(err.message || 'Verification failed. Contact admin.');
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-credit-card"></i> Pay Now`;
+    }
+}
+
+async function downloadMyReceipt() {
+    const btn = document.getElementById('mf-receipt-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
+    btn.disabled = true;
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/student-fees/receipt', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+
+        if (!result.success) throw new Error(result.message);
+
+        const data = result.data;
+        const html = `
+            <div style="padding: 40px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; background: #fff;">
+                <div style="border-bottom: 2px solid #0A66FF; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <h1 style="color: #0A66FF; margin: 0 0 5px 0;">Smart School System</h1>
+                        <p style="margin: 0; color: #666;">Fees Payment Receipt</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h2 style="margin: 0; color: #333;">RECEIPT</h2>
+                        <b style="color: #666; font-size: 14px;">#${data.receiptNumber}</b><br>
+                        <span style="color: #666; font-size: 14px;">Date: ${new Date(data.paymentDate).toLocaleDateString()}</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                    <div>
+                        <h4 style="margin: 0 0 10px 0; color: #666; text-transform: uppercase;">Student Details</h4>
+                        <p style="margin: 0 0 5px 0;"><strong>Name:</strong> ${data.studentName}</p>
+                        <p style="margin: 0 0 5px 0;"><strong>Class:</strong> ${data.className}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h4 style="margin: 0 0 10px 0; color: #666; text-transform: uppercase;">Payment Info</h4>
+                        <p style="margin: 0 0 5px 0;"><strong>Method:</strong> ${data.paymentMethod}</p>
+                        <p style="margin: 0 0 5px 0;"><strong>Transaction ID:</strong> ${data.transactionId}</p>
+                    </div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-top: 40px;">
+                    <thead>
+                        <tr style="background: #f8fafc;">
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Description</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Class</th>
+                            <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e2e8f0;">Amount Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0;">Class Fees</td>
+                            <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0;">${data.className}</td>
+                            <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">₹${data.paidAmount}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                    <table style="width: 300px;">
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold; font-size: 18px; color: #0f172a;">Total Paid:</td>
+                            <td style="padding: 8px; text-align: right; font-weight: bold; font-size: 18px; color: #10b981;">₹${data.paidAmount}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="margin-top: 60px; text-align: center; color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                    <p>This is a computer-generated receipt and does not require a physical signature.</p>
+                </div>
+            </div>
+        `;
+
+        const opt = {
+            margin: 0.5,
+            filename: `Receipt_${data.receiptNumber}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        const container = document.createElement('div');
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        await html2pdf().set(opt).from(container).save();
+        document.body.removeChild(container);
+
+    } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to download receipt');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }

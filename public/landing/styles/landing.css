@@ -947,6 +947,98 @@ section {
     transform: translateX(0);
 }
 
+
+/* ================================================
+   FEE STRUCTURE SECTION
+   ================================================ */
+.fee-structure {
+    background: var(--light-gray);
+    position: relative;
+    padding: 100px 0;
+}
+
+.fee-table-wrapper {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    margin-top: 40px;
+    border: 1px solid var(--gray-light);
+}
+
+.fee-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.fee-table th {
+    background: var(--dark-light);
+    color: white;
+    padding: 20px 25px;
+    font-weight: 600;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.fee-table td {
+    padding: 20px 25px;
+    border-bottom: 1px solid var(--gray-light);
+    font-size: 15px;
+    color: var(--gray);
+    transition: var(--transition);
+}
+
+.fee-table tr:last-child td {
+    border-bottom: none;
+}
+
+.fee-table tr:hover td {
+    background: rgba(10, 102, 255, 0.02);
+    color: var(--dark);
+}
+
+.class-name {
+    font-weight: 700;
+    color: var(--primary) !important;
+}
+
+.fee-amount {
+    font-weight: 700;
+    color: var(--dark) !important;
+    font-size: 18px !important;
+}
+
+.fee-desc {
+    max-width: 400px;
+}
+
+.fee-note {
+    margin-top: 30px;
+    padding: 15px 20px;
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid #ffc107;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: #856404;
+    display: inline-block;
+}
+
+.fee-note i {
+    margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+    .fee-table th, .fee-table td {
+        padding: 15px;
+    }
+    
+    .fee-table th:last-child, .fee-table td:last-child {
+        display: none;
+    }
+}
+
 /* ================================================
    LIVE LEARNING SECTION
    ================================================ */

@@ -9,6 +9,7 @@ const {
   getStudentsWithPayments,
   updateStudentPayment,
   getFeesCollectionOverview,
+  getAdminReceipt,
 } = require("../controllers/Admin/paymentController");
 const jwtAuth = require("../middleware/jwtAuth");
 const roleAuth = require("../middleware/roleAuth");
@@ -40,5 +41,8 @@ router.get("/receipt/:paymentId", generateReceipt);
 
 // POST /api/payments/bulk-receipts
 router.post("/bulk-receipts", generateBulkReceipts);
+
+// GET /api/payments/admin-receipt/:studentId
+router.get("/admin-receipt/:studentId", getAdminReceipt);
 
 module.exports = router;

@@ -43,6 +43,11 @@ const StudentSchema = new mongoose.Schema({
   admissionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Admission"
+  },
+  feesStatus: {
+    type: String,
+    enum: ["pending", "paid"],
+    default: "pending"
   }
 }, { _id: false });
 
@@ -141,6 +146,24 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save hook to handle studentData updates
+UserSchema.pre('save', function() {
+  try {
+    // Ensure studentData is properly initialized for students
+    if (this.role === 'student' && !this.studentData) {
+      this.studentData = {};
+    }
+    
+    // Ensure teacherData is properly initialized for teachers
+    if (this.role === 'teacher' && !this.teacherData) {
+      this.teacherData = {};
+    }
+  } catch (error) {
+    console.error('User pre-save hook error:', error);
+    throw error;
+  }
+});
 
 // Compound index for unique roll numbers within a class
 UserSchema.index({ "studentData.class": 1, "studentData.rollNo": 1 }, { 

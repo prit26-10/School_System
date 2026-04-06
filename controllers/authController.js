@@ -58,7 +58,8 @@ exports.login = async (req, res) => {
         userId: user.userId,
         role: user.role,
         name: user.name,
-        email: user.email
+        email: user.email,
+        feesStatus: user.studentData?.feesStatus || "pending"
       },
       process.env.JWT_SECRET,
       { expiresIn: "50d" }
@@ -73,7 +74,8 @@ exports.login = async (req, res) => {
         userId: user.userId,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        feesStatus: user.studentData?.feesStatus || "pending"
       }
     });
   } catch (err) {

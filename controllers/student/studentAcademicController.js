@@ -11,8 +11,8 @@ function normalizeClassValue(classValue) {
 exports.getStudentTimetable = async (req, res) => {
     try {
         // Fetch full user data from database to get class information
-        const user = await User.findById(req.user.id).lean();
-        const studentClass = user?.class_id || user?.class || user?.studentData?.class;
+        const user = await User.findById(req.user.id);
+        const studentClass = (user && user.studentData && user.studentData.class) || user.class_id || user.class;
 
         if (!studentClass) {
             return res.status(400).json({
@@ -21,12 +21,13 @@ exports.getStudentTimetable = async (req, res) => {
             });
         }
 
-        // Find the ClassSubject document using normalized class matching.
         const classDocs = await ClassSubject.find({}).lean();
         const normalizedStudentClass = normalizeClassValue(studentClass);
         const classSubjectData = classDocs.find(
             (doc) => normalizeClassValue(doc.class) === normalizedStudentClass
         );
+
+        console.log("getStudentTimetable debug: studentClass =", studentClass, ", normalized =", normalizedStudentClass, ", classSubjectData found =", !!classSubjectData);
 
         if (!classSubjectData) {
             return res.status(404).json({

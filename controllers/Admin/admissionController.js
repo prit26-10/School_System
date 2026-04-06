@@ -236,7 +236,6 @@ exports.approveApplication = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Application already approved' });
     }
 
-    // Use student email as primary email for login; fallback to parent email only if student email is not provided
     const studentEmail = application.studentEmail || application.email;
     const parentEmail = application.email;
 
@@ -247,26 +246,19 @@ exports.approveApplication = async (req, res) => {
       });
     }
 
-    console.log('Application status:', application.status);
-    console.log('Using student email for account:', studentEmail);
-
     // Check if user with student email already exists
     let user = await User.findOne({ email: studentEmail.toLowerCase() });
     let userExisted = false;
+    let randomPassword = "";
 
     if (!user) {
-      // Sanitize class to numeric format only
       const numericClass = application.class ? parseInt(application.class.toString().replace(/[^0-9]/g, '')) : undefined;
-      
       if (!numericClass) {
         return res.status(400).json({ success: false, message: 'Invalid class format for student' });
       }
 
-      // Generate roll number for the class
       const rollNo = await generateRollNumber(numericClass);
-      
-      // Create student account
-      const randomPassword = generateRandomPassword(8);
+      randomPassword = generateRandomPassword(8);
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
       const userId = 'STU-' + Date.now().toString(36).toUpperCase();
 
@@ -279,7 +271,6 @@ exports.approveApplication = async (req, res) => {
         profileImage: application.studentPhoto,
         mobileNumber: application.contactNumber,
         timezone: application.timezone || 'Asia/Kolkata',
-        // Student-specific data
         studentData: {
           class: numericClass,
           rollNo: rollNo,
@@ -299,92 +290,83 @@ exports.approveApplication = async (req, res) => {
           admissionId: application._id
         }
       });
-
-      console.log(`Created student ${user.name} with roll number ${rollNo} in class ${application.class}`);
-
-      // Send approval email with credentials to STUDENT EMAIL
-      // await sendEmail({
-      //   to: studentEmail,
-      //   subject: 'Student Application Approved - School System',
-      //   html: `
-      //     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-      //       <h2 style="color: #4CAF50;">Congratulations!</h2>
-      //       <p>Dear ${application.studentName},</p>
-      //       <p>Your admission application (ID: ${application.applicationId}) has been approved.</p>
-      //       <p>Your student account has been created. Here are your login credentials:</p>
-      //       <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-      //         <p><strong>Login URL:</strong> <a href="http://localhost:5000/login">School Portal</a></p>
-      //         <p><strong>Email:</strong> ${studentEmail}</p>
-      //         <p><strong>Password:</strong> ${randomPassword}</p>
-      //         <p><strong>Roll Number:</strong> ${rollNo}</p>
-      //         <p><strong>Class:</strong> ${application.class}</p>
-      //       </div>
-      //       <p>Please log in and change your password as soon as possible.</p>
-      //       <p>Regards,<br>School Admissions Team</p>
-      //     </div>
-      //   `
-      // });
+      console.log(`Created student ${user.name} with roll number ${rollNo}`);
     } else {
       userExisted = true;
-      console.log('User already exists, linking to application');
-      
-      // Update existing user with admission data if missing
-      const updates = {
-        $set: { role: 'student' }
-      };
-      
+      const updates = { $set: { role: 'student' } };
       const numericClass = application.class ? parseInt(application.class.toString().replace(/[^0-9]/g, '')) : undefined;
 
-      if (!user.studentData?.class && numericClass) {
-        updates.$set['studentData.class'] = numericClass;
-      }
-      if (!user.studentData?.rollNo) {
-        updates.$set['studentData.rollNo'] = await generateRollNumber(numericClass || user.studentData?.class);
-      }
-      if (!user.studentData?.dob && application.dob) {
-        updates.$set['studentData.dob'] = application.dob;
-      }
-      if (!user.studentData?.gender && application.gender) {
-        updates.$set['studentData.gender'] = application.gender;
-      }
-      if (!user.studentData?.parentDetails?.name && application.parentName) {
-        updates.$set['studentData.parentDetails.name'] = application.parentName;
-      }
-      if (!user.studentData?.parentDetails?.relationship && application.relationship) {
-        updates.$set['studentData.parentDetails.relationship'] = application.relationship;
-      }
-      if (!user.studentData?.parentDetails?.phone && application.phone) {
-        updates.$set['studentData.parentDetails.phone'] = application.phone;
-      }
-      if (!user.studentData?.parentDetails?.email && parentEmail) {
-        updates.$set['studentData.parentDetails.email'] = parentEmail;
-      }
-      if (!user.studentData?.admissionId) {
-        updates.$set['studentData.admissionId'] = application._id;
-      }
+      if (!user.studentData?.class && numericClass) updates.$set['studentData.class'] = numericClass;
+      if (!user.studentData?.rollNo) updates.$set['studentData.rollNo'] = await generateRollNumber(numericClass || user.studentData?.class);
+      if (!user.studentData?.admissionId) updates.$set['studentData.admissionId'] = application._id;
       
-      if (Object.keys(updates.$set).length > 1) { // More than just role
-        await User.findByIdAndUpdate(user._id, updates);
-        console.log('Updated existing user with admission data');
-      }
+      await User.findByIdAndUpdate(user._id, updates);
+      console.log('Linked existing user to application');
     }
 
-    // Update application status
     application.status = 'approved';
     application.userId = user._id;
     application.reviewedAt = new Date();
     await application.save();
-    console.log('Application approved');
 
-    res.json({
-      success: true,
-      message: 'Application approved successfully',
-      userExisted,
-      rollNo: user.rollNo
-    });
+    // Handle Fees and Payments
+    const ClassSubject = require("../../models/ClassSubject");
+    const ClassFees = require("../../models/ClassFees");
+    const StudentPayment = require("../../models/StudentPayment");
+    
+    let classSubject = await ClassSubject.findOne({ class: application.class });
+    if (!classSubject) classSubject = await ClassSubject.findOne({ name: application.class });
+    if (!classSubject) {
+      const match = application.class?.toString().match(/\d+/);
+      if (match) classSubject = await ClassSubject.findOne({ name: `Class ${match[0]}` });
+    }
+
+    let totalFeeAmount = 0;
+    if (classSubject) {
+      const classFees = await ClassFees.findOne({ classId: classSubject._id });
+      if (classFees) {
+        totalFeeAmount = classFees.totalFee;
+        const existingPayment = await StudentPayment.findOne({ studentId: user._id });
+        if (!existingPayment) {
+          await StudentPayment.create({
+            studentId: user._id,
+            classId: classSubject._id,
+            totalFees: totalFeeAmount,
+            paidAmount: 0,
+            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+            academicYear: new Date().getFullYear().toString(),
+            paymentStatus: "pending"
+          });
+        }
+      }
+    }
+
+    // Send email
+    const appUrl = process.env.APP_URL || "http://localhost:5000";
+    const { admission_approved } = require('../../config/emailTemplates');
+    try {
+      await sendEmail({
+        to: studentEmail,
+        subject: admission_approved.subject,
+        html: admission_approved.html(
+          application.studentName,
+          application.applicationId,
+          studentEmail,
+          userExisted ? "(Use your existing password)" : randomPassword,
+          user.studentData?.rollNo || "(Assigned after login)",
+          application.class,
+          totalFeeAmount,
+          appUrl
+        )
+      });
+    } catch (e) {
+      console.error("Email send fail:", e);
+    }
+
+    res.json({ success: true, message: 'Application approved', userExisted });
   } catch (error) {
-    console.error('Approve application error:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+    console.error('Approve error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -403,27 +385,9 @@ exports.rejectApplication = async (req, res) => {
 
     application.status = 'rejected';
     application.reviewedAt = new Date();
-    // reviewedBy is not set since admin is not a database user
     application.rejectionReason = reason || '';
 
     await application.save();
-
-    // Send rejection email
-    // await sendEmail({
-    //   to: application.email,
-    //   subject: 'Update on Your Student Application - School System',
-    //   html: `
-    //     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-    //       <h2 style="color: #f44336;">Application Update</h2>
-    //       <p>Dear ${application.studentName},</p>
-    //       <p>We have reviewed your application (ID: ${application.applicationId}).</p>
-    //       <p>Unfortunately, your application for admission has been rejected at this time.</p>
-    //       ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
-    //       <p>If you have any questions, please feel free to contact us.</p>
-    //       <p>Regards,<br>School Admissions Team</p>
-    //     </div>
-    //   `
-    // });
 
     res.json({
       success: true,

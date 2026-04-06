@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function () {
     initNavbar();
     initScrollAnimations();
     initCounterAnimation();
+    initFeeStructure();
+    initCollapsibleFeeStructure();
     initTestimonialsCarousel();
     initContactForm();
     initSmoothScroll();
@@ -217,4 +219,78 @@ function initSmoothScroll() {
             }
         });
     });
+}
+function initCollapsibleFeeStructure() {
+    const feeSection = document.querySelector('.fee-structure');
+    const feeSectionTitle = feeSection?.querySelector('.section-title');
+    const feesContainer = feeSection?.querySelector('.fees-container');
+    
+    if (!feeSection || !feeSectionTitle || !feesContainer) return;
+    
+    // Hide fee structure by default
+    feesContainer.style.display = 'none';
+    
+    // Add cursor pointer to title to indicate it's clickable
+    feeSectionTitle.style.cursor = 'pointer';
+    feeSectionTitle.style.position = 'relative';
+    
+    // Add toggle indicator
+    const toggleIndicator = document.createElement('span');
+    toggleIndicator.innerHTML = '<i class="fas fa-chevron-down"></i>';
+    toggleIndicator.style.marginLeft = '10px';
+    toggleIndicator.style.transition = 'transform 0.3s ease';
+    feeSectionTitle.appendChild(toggleIndicator);
+    
+    // Add click event to toggle visibility
+    feeSectionTitle.addEventListener('click', function() {
+        const isHidden = feesContainer.style.display === 'none';
+        
+        if (isHidden) {
+            feesContainer.style.display = 'block';
+            toggleIndicator.innerHTML = '<i class="fas fa-chevron-up"></i>';
+            // Add reveal animation
+            feesContainer.classList.add('reveal', 'reveal-up');
+        } else {
+            feesContainer.style.display = 'none';
+            toggleIndicator.innerHTML = '<i class="fas fa-chevron-down"></i>';
+        }
+    });
+}
+
+function initFeeStructure() {
+    const feeTableBody = document.getElementById('feeTableBody');
+    if (!feeTableBody) return;
+
+    fetch('/api/fees/public')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+                feeTableBody.innerHTML = '';
+                data.data.forEach(fee => {
+                    // Check if fee.classId exists and has class property
+                    if (fee.classId && fee.classId.class !== undefined) {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td class="class-name">Class ${fee.classId.class}</td>
+                            <td class="fee-amount">₹${fee.totalFee.toLocaleString()}</td>
+                            <td class="fee-desc">${fee.description || 'Standard academic curriculum with all activities.'}</td>
+                        `;
+                        feeTableBody.appendChild(tr);
+                    } else {
+                        console.warn('Fee record missing classId:', fee);
+                    }
+                });
+                
+                // If no valid fee records were added
+                if (feeTableBody.children.length === 0) {
+                    feeTableBody.innerHTML = '<tr><td colspan="3" class="text-center">No fee protocols defined yet.</td></tr>';
+                }
+            } else {
+                feeTableBody.innerHTML = '<tr><td colspan="3" class="text-center">No fee protocols defined yet.</td></tr>';
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching fees:', err);
+            feeTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading fees. Please try again.</td></tr>';
+        });
 }

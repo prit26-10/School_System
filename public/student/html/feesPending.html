@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pending Fees - Smart School System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/student/css/feesPending.css">
+</head>
+<body>
+    <div class="fees-gate-wrapper">
+        <div class="glow-bg"></div>
+        <div class="fees-container">
+            <div class="header">
+                <i class="fas fa-lock"></i>
+                <h2>Dashboard Locked</h2>
+                <p>Please clear your pending class fees to access your student dashboard.</p>
+            </div>
+            
+            <div id="loading" class="loading-spinner">
+                <i class="fas fa-circle-notch fa-spin"></i> Fetching details...
+            </div>
+            
+            <div id="fees-card" class="fees-card" style="display: none;">
+                <div class="invoice-header">
+                    <div class="student-info">
+                        <h3 id="fp-student-name">...</h3>
+                        <span id="fp-class-name" class="badge">...</span>
+                    </div>
+                    <div class="status-badge pending">Pending</div>
+                </div>
+                
+                <div class="invoice-details">
+                    <div class="detail-row">
+                        <span>Total Class Fees:</span>
+                        <strong id="fp-total-fees">₹0</strong>
+                    </div>
+                </div>
+                
+                <button id="pay-now-btn" class="pay-btn" onclick="initiatePayment()">
+                    <i class="fas fa-credit-card"></i> Pay Now Securely
+                </button>
+            </div>
+            
+            <div class="footer-note">
+                Having trouble? <a href="mailto:admin@smartschool.com">Contact Administration</a>
+                <br>
+                <a href="/login" style="margin-top: 15px; display: inline-block;">Return to Login</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Razorpay Checkout -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="/student/js/feesPending.js"></script>
+</body>
+</html>

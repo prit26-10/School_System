@@ -65,6 +65,7 @@ app.use("/api/teacher-applications", require("./routes/teacherApplicationRoutes"
 app.use("/api/admin", require("./routes/adminManageRoutes"));
 app.use("/api/class-subjects", require("./routes/classSubjectRoutes"));
 app.use("/api/fees", require("./routes/feesRoutes"));
+app.use("/api/student-fees", require("./routes/studentFeesRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/assign", require("./routes/assignRoutes"));
 app.use("/api/academic-year", require("./routes/academicYearRoutes"));
@@ -85,6 +86,7 @@ app.get("/landing/application-success", (req, res) => res.sendFile(path.join(__d
 app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "public/login/html/login.html")));
 app.get("/admin/dashboard", (req, res) => res.sendFile(path.join(__dirname, "public/admin/html/dashboard.html")));
 app.get("/student/dashboard", (req, res) => res.sendFile(path.join(__dirname, "public/student/html/studentDashboard.html")));
+app.get("/student/fees-pending", (req, res) => res.sendFile(path.join(__dirname, "public/student/html/feesPending.html")));
 app.get("/teacher/dashboard", (req, res) => res.sendFile(path.join(__dirname, "public/teacher/html/teacherdashboard.html")));
 
 // Catch-all API 404

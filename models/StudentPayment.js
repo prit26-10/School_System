@@ -20,10 +20,6 @@ const StudentPaymentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    dueAmount: {
-      type: Number,
-      required: true,
-    },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid"],
@@ -36,6 +32,9 @@ const StudentPaymentSchema = new mongoose.Schema(
     lastPaymentDate: {
       type: Date,
     },
+    razorpayOrderId: {
+      type: String,
+    },
     paymentHistory: [{
       amount: {
         type: Number,
@@ -47,8 +46,17 @@ const StudentPaymentSchema = new mongoose.Schema(
       },
       paymentMethod: {
         type: String,
-        enum: ["online", "bank_transfer"],
+        enum: ["online", "bank_transfer", "razorpay"],
         default: "online",
+      },
+      razorpayPaymentId: {
+        type: String,
+      },
+      razorpayOrderId: {
+        type: String,
+      },
+      razorpaySignature: {
+        type: String,
       },
       receiptNumber: {
         type: String,
@@ -67,26 +75,19 @@ const StudentPaymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Calculate due amount before saving
-StudentPaymentSchema.pre('save', function(next) {
-  // Make sure next is a function
-  if (typeof next !== 'function') {
-    console.error('Pre-save hook: next is not a function');
-    return;
-  }
-  
+// Calculate payment status before saving
+StudentPaymentSchema.pre('save', function() {
+  // Check if paidAmount was modified
   if (this.isModified('paidAmount')) {
-    this.dueAmount = this.totalFees - this.paidAmount;
     this.lastPaymentDate = new Date();
     
-    // Update payment status
+    // Update payment status (Full payment only)
     if (this.paidAmount >= this.totalFees) {
       this.paymentStatus = "paid";
     } else {
       this.paymentStatus = "pending";
     }
   }
-  next();
 });
 
 module.exports = mongoose.model("StudentPayment", StudentPaymentSchema);

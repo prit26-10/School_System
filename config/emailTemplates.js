@@ -65,6 +65,60 @@ const emailTemplates = {
             <br/>
             <p>Best regards,<br/>School System Team</p>
         `
+    },
+    
+    admission_approved: {
+        subject: "Student Application Approved - School System",
+        html: (studentName, applicationId, studentEmail, password, rollNo, className, totalFee, appUrl) => `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <h2 style="color: #4CAF50;">Congratulations!</h2>
+              <p>Dear ${studentName},</p>
+              <p>Your admission application (ID: ${applicationId}) has been approved.</p>
+              <p>Your student account has been created. Here are your login credentials:</p>
+              <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p><strong>Login URL:</strong> <a href="${appUrl}/login">School Portal</a></p>
+                <p><strong>Email:</strong> ${studentEmail}</p>
+                <p><strong>Password:</strong> ${password}</p>
+                <p><strong>Roll Number:</strong> ${rollNo}</p>
+                <p><strong>Class:</strong> ${className}</p>
+                <p><strong>Total Admission Fees:</strong> ₹${totalFee}</p>
+              </div>
+              <p style="color: #d97706; font-weight: bold;">Note: You must pay your class fees to access the full student dashboard.</p>
+              <div style="text-align: center; margin-top: 25px;">
+                <a href="${appUrl}/login" style="display:inline-block; padding: 12px 25px; background-color: #0A66FF; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Pay Fees Now</a>
+              </div>
+              <p style="margin-top: 25px;">Regards,<br>School Admissions Team</p>
+            </div>
+        `
+    },
+    
+    payment_successful: {
+        subject: "Fees Payment Successful",
+        html: (studentName, amount, paymentId, className) => `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <h2 style="color: #4CAF50;">Payment Successful</h2>
+              <p>Dear ${studentName},</p>
+              <p>Your fees payment for Rs. ${amount} has been successfully received.</p>
+              <p><strong>Payment ID:</strong> ${paymentId}</p>
+              <p><strong>Class:</strong> ${className}</p>
+              <p>You can now access your full student dashboard.</p>
+              <p>Regards,<br>School Administration</p>
+            </div>
+        `
+    },
+    
+    fees_reminder: {
+        subject: "Pending Fees Reminder",
+        html: (studentName, className, appUrl) => `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <h2 style="color: #ef4444;">Pending Fees Reminder</h2>
+              <p>Dear ${studentName},</p>
+              <p>This is a reminder to pay your pending class fees for ${className}.</p>
+              <p>Access to your student dashboard requires your fees to be cleared.</p>
+              <a href="${appUrl}/login" style="display:inline-block; padding: 10px 20px; margin-top: 10px; background-color: #0A66FF; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Pay Now</a>
+              <p>Regards,<br>School Administration</p>
+            </div>
+        `
     }
 };
 

@@ -455,11 +455,9 @@ function loadPage(page, titleOverride = null) {
         'exam-timetable': {
             title: 'Create Exam Timetable',
             subtitle: 'Schedule exam timings',
-        'exam-timetable': {
-            title: 'Create Exam Timetable',
-            subtitle: 'Schedule exam timings',
             render: renderExamTimetable,
             init: initializeExamTimetable
+
         },
         'publish-results': {
             title: 'Publish Results',
@@ -3805,92 +3803,6 @@ function renderMonthlyReport() {
         `;
 }
 
-function renderDefineFees() {
-    const classes = AppState.allClasses || [];
-    // Sort classes by class in ascending order
-    const sortedClasses = [...classes].sort((a, b) => (a.class || 0) - (b.class || 0));
-
-    return `
-        <div class="fees-management-container">
-            <!-- SECTION 1: DEFINE CLASS FEES STRUCTURE -->
-            <div class="fees-card mb-4">
-                <div class="fees-card-header">
-                    <div class="fees-header-left">
-                        <i class="fas fa-coins fees-header-icon"></i>
-                        <h3 class="fees-header-title">Define Class Fees Structure</h3>
-                    </div>
-                </div>
-                <div class="fees-card-body">
-                    <form id="define-fees-form">
-                        <input type="hidden" id="total-fee">
-                        
-                        <div class="fees-grid-row">
-                            <div class="fees-grid-col">
-                                <label class="fees-form-label">Select Class</label>
-                                <select id="fees-class-id" class="fees-form-input" required>
-                                    <option value="">Choose Class...</option>
-                                    ${sortedClasses.map(c => `<option value="${c.class}">Class-${c.class}</option>`).join('')}
-                                </select>
-                            </div>
-                            
-                            <div class="fees-grid-col">
-                                <label class="fees-form-label">Annual Fee (INR ₹)</label>
-                                <input type="text" id="tuition-fee" class="fees-form-input" placeholder="e.g. 50000" required>
-                            </div>
-                            
-                            <div class="fees-grid-col">
-                                <label class="fees-form-label">Exam Fee (INR ₹)</label>
-                                <input type="text" id="exam-fee" class="fees-form-input" placeholder="e.g. 2000" required>
-                            </div>
-
-                            <div class="fees-grid-col fees-btn-col">
-                                <button type="button" id="btn-save-fees" class="fees-save-button" onclick="saveClassFees()">
-                                    <i class="fas fa-save"></i>
-                                    Save Fees
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- SECTION 2: CURRENT FEES STRUCTURE -->
-            <div class="fees-card">
-                <div class="fees-card-header fees-header-between">
-                    <div class="fees-header-left">
-                        <i class="fas fa-list-alt fees-header-icon"></i>
-                        <h3 class="fees-header-title">Current Fees Structure</h3>
-                    </div>
-                    <div class="fees-header-right">
-                        <button class="fees-btn-refresh-blue" onclick="loadDefinedFees()">
-                            <i class="fas fa-sync-alt"></i>
-                            Refresh
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="fees-table-modern">
-                        <thead>
-                            <tr>
-                                <th>CLASS</th>
-                                <th>TOTAL SUBJECTS</th>
-                                <th>ANNUAL FEES</th>
-                                <th>EXAM FEES</th>
-                                <th>TOTAL FEES (INR ₹)</th>
-                                <th>LAST UPDATED</th>
-                                <th>ACTIONS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="defined-fees-tbody">
-                            <tr><td colspan="7" class="text-center py-5">Fetching fee structures...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        `;
-}
 function renderPaymentUpdates() {
     return `
         <div class="payment-updates-container">
@@ -6369,19 +6281,19 @@ async function initializeExamTimetable() {
     try {
         AppState.isLoading = true;
         const token = localStorage.getItem('token');
-        
+
         // Fetch Exams
         const examResponse = await fetch('/api/exams', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const examResult = await examResponse.json();
-        
+
         // Fetch Classes
         const classResponse = await fetch('/api/class-subjects/classes', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const classResult = await classResponse.json();
-        
+
         console.log('Class Result:', classResult);
 
         // Exam Periods fetching removed as it's now input title
@@ -6389,7 +6301,7 @@ async function initializeExamTimetable() {
         const classSelect = document.getElementById('exam-class-select');
         if (classSelect) {
             if (classResult.success && Array.isArray(classResult.data)) {
-                classSelect.innerHTML = '<option value="">Select Class</option>' + 
+                classSelect.innerHTML = '<option value="">Select Class</option>' +
                     classResult.data.map(cls => `<option value="${cls.class}">${cls.name}</option>`).join('');
                 AppState.allClasses = classResult.data;
             } else {
@@ -6411,11 +6323,11 @@ function handleExamChange() {
 function handleClassChange() {
     const classId = document.getElementById('exam-class-select').value;
     const subjectSelect = document.getElementById('exam-subject-select');
-    
+
     if (classId && subjectSelect) {
         const selectedClass = AppState.allClasses.find(c => c.class == classId);
         if (selectedClass && selectedClass.subjects) {
-            subjectSelect.innerHTML = '<option value="">Select Subject</option>' + 
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>' +
                 selectedClass.subjects.map(s => `<option value="${s.code}">${s.name}</option>`).join('');
         }
     } else if (subjectSelect) {
@@ -6429,19 +6341,19 @@ async function refreshTimetableGrid() {
     const examId = examTitleInput ? examTitleInput.value : '';
     const classId = document.getElementById('exam-class-select').value;
     const tbody = document.getElementById('exam-timetable-body');
-    
+
     if (!examId || !classId) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">No data to display. Select exam and class above.</td></tr>';
         return;
     }
-    
+
     try {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/admin/${examId}/timetable/${classId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
-        
+
         if (result.success && result.data.length > 0) {
             AppState.currentTimetableData = result.data; // Store for editing
             tbody.innerHTML = result.data.map(entry => `
@@ -6492,7 +6404,7 @@ async function refreshTimetableGrid() {
 
         } else {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">No exams scheduled for this selection.</td></tr>';
-            
+
             // Enable all subjects
             const subjectSelect = document.getElementById('exam-subject-select');
             if (subjectSelect) {
@@ -6507,19 +6419,19 @@ async function refreshTimetableGrid() {
 
 async function addExamTimetableEntry(event) {
     event.preventDefault();
-    
+
     const examTitleInput = document.getElementById('exam-title-input');
     const examTitle = examTitleInput ? examTitleInput.value : '';
     const classId = document.getElementById('exam-class-select').value;
-    
+
     if (!examTitle || !classId) {
         showToast('Please enter Exam Title and select Class first', 'warning');
         return;
     }
-    
+
     const subjectSelect = document.getElementById('exam-subject-select');
     const editingId = AppState.currentTimetableEditingId;
-    
+
     const formData = {
         examTitle,
         class: parseInt(classId),
@@ -6530,23 +6442,24 @@ async function addExamTimetableEntry(event) {
         startTime: document.getElementById('exam-start-time').value,
         endTime: document.getElementById('exam-end-time').value
     };
-    
+
     try {
         const token = localStorage.getItem('token');
         const url = editingId ? `/api/exams/admin/timetable/${editingId}` : '/api/exams/admin/timetable';
         const method = editingId ? 'PUT' : 'POST';
-        
+
         const response = await fetch(url, {
             method: method,
-            headers: { 
+            headers: {
+
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(formData)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             showToast(editingId ? 'Entry updated successfully' : 'Entry added successfully', 'success');
             resetTimetableForm();
@@ -6595,7 +6508,7 @@ function editExamTimetableEntry(id) {
         const icon = btnSubmit.querySelector('i');
         if (icon) icon.className = 'fas fa-save';
     }
-    
+
     if (btnReset) btnReset.style.display = 'block';
     if (actionTitle) actionTitle.textContent = 'Edit Entry';
 
@@ -6620,7 +6533,7 @@ function resetTimetableForm() {
         const icon = btnSubmit.querySelector('i');
         if (icon) icon.className = 'fas fa-plus';
     }
-    
+
     if (btnReset) btnReset.style.display = 'none';
     if (actionTitle) actionTitle.textContent = 'Add Entry';
 }
@@ -6636,11 +6549,11 @@ function calculateTimes(changeType) {
         if (startInput.value && durationInput.value) {
             const [hours, minutes] = startInput.value.split(':').map(Number);
             const duration = parseInt(durationInput.value);
-            
+
             const date = new Date();
             date.setHours(hours, minutes, 0);
             date.setMinutes(date.getMinutes() + duration);
-            
+
             const endHours = String(date.getHours()).padStart(2, '0');
             const endMinutes = String(date.getMinutes()).padStart(2, '0');
             endInput.value = `${endHours}:${endMinutes}`;
@@ -6649,12 +6562,12 @@ function calculateTimes(changeType) {
         if (startInput.value && endInput.value) {
             const [sh, sm] = startInput.value.split(':').map(Number);
             const [eh, em] = endInput.value.split(':').map(Number);
-            
+
             let startTotal = sh * 60 + sm;
             let endTotal = eh * 60 + em;
-            
+
             if (endTotal < startTotal) endTotal += 24 * 60; // Next day
-            
+
             durationInput.value = endTotal - startTotal;
         }
     }
@@ -6662,14 +6575,14 @@ function calculateTimes(changeType) {
 
 async function deleteExamTimetableEntry(id) {
     if (!confirm('Are you sure you want to delete this schedule entry?')) return;
-    
+
     try {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/admin/timetable/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         const result = await response.json();
         if (result.success) {
             showToast('Deleted successfully', 'success');
@@ -6686,15 +6599,16 @@ async function deleteExamTimetableEntry(id) {
 function exportTimetablePDF() {
     const examTitleInput = document.getElementById('exam-title-input');
     const classSelect = document.getElementById('exam-class-select');
-    
+
     if (!examTitleInput || !classSelect || !examTitleInput.value || !classSelect.value) {
         showToast('Please enter Exam Title and select Class to export', 'warning');
+
         return;
     }
 
     const examName = examTitleInput.value;
     const className = classSelect.options[classSelect.selectedIndex].text;
-    
+
     if (!AppState.currentTimetableData || AppState.currentTimetableData.length === 0) {
         showToast('No timetable data available to export', 'warning');
         return;
@@ -6773,8 +6687,8 @@ function exportTimetablePDF() {
         margin: 10,
         filename: `Timetable_${className.replace(/\s+/g, '_')}_${examName.replace(/\s+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 1.0 },
-        html2canvas: { 
-            scale: 2, 
+        html2canvas: {
+            scale: 2,
             useCORS: true,
             logging: false,
             windowWidth: 1040
@@ -6852,8 +6766,8 @@ async function fetchEvaluatedExams() {
     const empty = document.getElementById('publish-results-empty');
     const container = document.getElementById('publish-results-table-container');
     const tbody = document.getElementById('publish-results-tbody');
-    
-    if(!tbody) return;
+
+    if (!tbody) return;
 
     if (loading) loading.style.display = 'block';
     if (empty) empty.style.display = 'none';
@@ -6873,7 +6787,7 @@ async function fetchEvaluatedExams() {
             tbody.innerHTML = result.data.map(exam => {
                 const dateStr = formatDate(exam.date);
                 const isAllPublished = exam.submissions && exam.submissions.length > 0 && exam.submissions.every(s => s.status === 'published');
-                
+
                 return `
                     <tr style="border-bottom: 1px solid #f8fafc; transition: all 0.2s;" onmouseover="this.style.background='#fcfdfe'" onmouseout="this.style.background=''">
                         <td style="padding: 20px 24px;">
@@ -6895,14 +6809,15 @@ async function fetchEvaluatedExams() {
                             </div>
                         </td>
                         <td style="padding: 20px 24px; text-align: right;">
-                            ${isAllPublished ? 
-                                `<span style="color: #10b981; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                            ${isAllPublished ?
+                        `<span style="color: #10b981; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
                                     <i class="fas fa-check-circle"></i> Published
                                  </span>` :
-                                `<button onclick="publishResults('${exam.timetableId}')" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);" onmouseover="this.style.background='#1d4ed8'; this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#2563eb'; this.style.transform='none'">
+                        `<button onclick="publishResults('${exam.timetableId}')" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);" onmouseover="this.style.background='#1d4ed8'; this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#2563eb'; this.style.transform='none'">
                                     <i class="fas fa-bullhorn" style="font-size: 0.7rem;"></i> Publish Marks
+
                                 </button>`
-                            }
+                    }
                         </td>
                     </tr>
                 `;
@@ -6921,7 +6836,7 @@ async function fetchEvaluatedExams() {
 }
 
 async function publishResults(timetableId) {
-    if(!confirm('Are you sure you want to publish these marks? This will make them visible to students.')) return;
+    if (!confirm('Are you sure you want to publish these marks? This will make them visible to students.')) return;
 
     try {
         const token = localStorage.getItem('token');
@@ -6929,7 +6844,7 @@ async function publishResults(timetableId) {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         const result = await response.json();
         if (result.success) {
             showToast(result.message, 'success');
@@ -6945,7 +6860,7 @@ async function publishResults(timetableId) {
 
 // Hook into page load for publish-results
 const originalLoadPage = loadPage;
-loadPage = function(page, titleOverride = null) {
+loadPage = function (page, titleOverride = null) {
     originalLoadPage(page, titleOverride);
     if (page === 'publish-results') {
         fetchEvaluatedExams();
@@ -6987,7 +6902,7 @@ async function loadAllExamTimetables() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
-        
+
         if (result.success && result.data && result.data.length > 0) {
             // Group by exam and class
             const grouped = {};
@@ -7005,10 +6920,10 @@ async function loadAllExamTimetables() {
             });
 
             let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
-            
+
             for (const key in grouped) {
                 const group = grouped[key];
-                
+
                 // Escape properly for inline onclick
                 const escapedExamName = group.examName.replace(/'/g, "\\'");
 
@@ -7063,7 +6978,7 @@ function viewGroupedExamTimetable(examName, className) {
 
     const titleInput = document.getElementById('exam-title-input');
     if (titleInput) titleInput.value = examName;
-    
+
     const classSelect = document.getElementById('exam-class-select');
     if (classSelect) {
         classSelect.value = className;
@@ -7141,6 +7056,75 @@ function renderResultManagement() {
     `;
 }
 
+// FEES MANAGEMENT MODULE
+// ============================================
+
+function renderDefineFees() {
+    return `
+        <div class="content-card applications-card">
+            <div class="applications-header">
+                <div class="applications-title">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <h2>Class Fee Structures</h2>
+                </div>
+                <div class="applications-controls">
+                    <button class="btn-refresh" onclick="openAddFeeModal()">
+                        <i class="fas fa-plus"></i> Define Class Fees
+                    </button>
+                    <button class="btn-refresh" onclick="loadFeeStructures()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="table-wrapper" style="margin-top: 20px;">
+                <table class="data-table applications-table">
+                    <thead>
+                        <tr>
+                            <th>Class Name</th>
+                            <th>Total Fees (₹)</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fees-structure-body">
+                        <tr><td colspan="4" style="text-align: center;">Loading fee structures...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="add-fee-modal" class="modal">
+            <div class="modal-content small">
+                <div class="modal-header">
+                    <button class="modal-close" onclick="closeModal('add-fee-modal')">&times;</button>
+                    <h2 class="modal-title" id="fee-modal-title">Define Fee Structure</h2>
+                </div>
+                <div class="modal-body">
+                    <form id="fee-structure-form" onsubmit="handleFeeSubmit(event)">
+                        <input type="hidden" id="fee-class-id">
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display:block; margin-bottom: 5px;">Select Class *</label>
+                            <select id="fee-class-select" required style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                                <option value="">Select a class</option>
+                            </select>
+                            <p style="font-size: 12px; color: #666; margin-top: 4px;">Choose an existing class from the system to attach this fee.</p>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display:block; margin-bottom: 5px;">Total Fees (₹) *</label>
+                            <input type="number" id="fee-total-amount" required placeholder="e.g. 50000" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="display:block; margin-bottom: 5px;">Description</label>
+                            <input type="text" id="fee-description" placeholder="Optional details (e.g. Academic Year 2026-27)" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; padding: 12px;">Save Fee Structure</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 async function initializeResultManagement() {
     // Load Exams for dropdown
     try {
@@ -7149,12 +7133,12 @@ async function initializeResultManagement() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
-        
+
         const select = document.getElementById('result-exam-select');
         if (!select) return;
 
         if (result.success && result.data.length > 0) {
-            select.innerHTML = '<option value="">Select Examination</option>' + 
+            select.innerHTML = '<option value="">Select Examination</option>' +
                 result.data.map(exam => `<option value="${exam._id}">${exam.name}</option>`).join('');
         } else {
             select.innerHTML = '<option value="">No Exams Found</option>';
@@ -7194,7 +7178,7 @@ async function fetchOverallResults() {
 
         if (result.success && result.data.results.length > 0) {
             if (container) container.style.display = 'block';
-            
+
             // Build dynamic headers
             const subjects = result.data.subjects;
             thead.innerHTML = `
@@ -7222,9 +7206,9 @@ async function fetchOverallResults() {
                             <div style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">${res.studentName}</div>
                         </td>
                         ${subjects.map(sub => {
-                            const score = res.results[sub.name]?.marks ?? '-';
-                            return `<td style="padding: 18px 20px; text-align: center; color: #475569; font-weight: 600;">${score}</td>`;
-                        }).join('')}
+                    const score = res.results[sub.name]?.marks ?? '-';
+                    return `<td style="padding: 18px 20px; text-align: center; color: #475569; font-weight: 600;">${score}</td>`;
+                }).join('')}
                         <td style="padding: 18px 20px; text-align: center; font-weight: 800; color: #1e293b;">${res.totalMarksObtained}</td>
                         <td style="padding: 18px 20px; text-align: center; font-weight: 800; color: #2563eb;">${res.percentage}%</td>
                         <td style="padding: 18px 20px; text-align: center;">
@@ -7294,15 +7278,15 @@ function viewReportCard(studentId) {
                 </thead>
                 <tbody>
                     ${window.currentClassResults.subjects.map(sub => {
-                        const marks = data.results[sub.name]?.marks ?? '-';
-                        return `
+        const marks = data.results[sub.name]?.marks ?? '-';
+        return `
                             <tr style="border-bottom: 1px solid #e2e8f0;">
                                 <td style="padding: 12px 20px; font-weight: 700; color: #334155;">${sub.name}</td>
                                 <td style="padding: 12px 20px; text-align: center; color: #64748b;">${sub.maxMarks}</td>
                                 <td style="padding: 12px 20px; text-align: center; font-weight: 800; color: #0f172a;">${marks}</td>
                             </tr>
                         `;
-                    }).join('')}
+    }).join('')}
                 </tbody>
                 <tfoot>
                     <tr style="background: #f1f5f9; font-weight: 800;">
@@ -7357,7 +7341,7 @@ function printReportCard() {
 
     const nameEl = element.querySelector('p[style*="font-size: 1.1rem"]');
     const studentName = nameEl ? nameEl.textContent.trim() : 'Student';
-    
+
     html2pdf().from(element).set({
         margin: 10,
         filename: `Report_Card_${studentName.replace(/\s+/g, '_')}.pdf`,
@@ -7367,4 +7351,541 @@ function printReportCard() {
     }).save().then(() => {
         if (noPrint) noPrint.style.display = 'block';
     });
+}
+function initializeDefineFees() {
+    loadFeeStructures();
+    populateClassDropdownForFees();
+}
+
+async function populateClassDropdownForFees() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/class-subjects/classes', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.success && result.data) {
+            const select = document.getElementById('fee-class-select');
+            select.innerHTML = '<option value="">Select a class</option>' + result.data.map(cls => `<option value="${cls._id}">${cls.name || 'Class ' + cls.class}</option>`).join('');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function loadFeeStructures() {
+    const tbody = document.getElementById('fees-structure-body');
+    const token = localStorage.getItem('token');
+
+    try {
+        const response = await fetch('/api/fees/class-fees', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (result.success && result.data && result.data.length > 0) {
+            tbody.innerHTML = result.data.map(fee => `
+                <tr>
+                    <td style="font-weight: 600;">${fee.classId ? (fee.classId.name || 'Class ' + fee.classId.class) : 'Unknown'}</td>
+                    <td style="color: #10b981; font-weight: bold;">₹${fee.totalFee.toLocaleString()}</td>
+                    <td>${fee.description || '-'}</td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-action btn-edit" 
+                                onclick="openEditFeeModal('${fee.classId ? fee.classId._id : ''}', ${fee.totalFee}, \`${fee.description || ''}\`)" 
+                                title="Edit" style="background: #eff6ff; color: #3b82f6;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-action btn-reject" onclick="deleteFeeStructure('${fee._id}')" 
+                                title="Delete" style="background: #fef2f2; color: #ef4444;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: #64748b;">No fee structures defined yet.</td></tr>`;
+        }
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: red;">Failed to load data.</td></tr>`;
+    }
+}
+
+function openAddFeeModal() {
+    const form = document.getElementById('fee-structure-form');
+    if (form) form.reset();
+
+    // Set titles and states
+    document.getElementById('fee-modal-title').textContent = 'Define Fee Structure';
+    const select = document.getElementById('fee-class-select');
+    if (select) select.disabled = false;
+
+    const modal = document.getElementById('add-fee-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function openEditFeeModal(classId, totalFee, description) {
+    const form = document.getElementById('fee-structure-form');
+    if (!form) return;
+
+    // Fill form
+    const select = document.getElementById('fee-class-select');
+    if (select) {
+        select.value = classId;
+        select.disabled = true; // Typically you don't change class on edit
+    }
+
+    document.getElementById('fee-total-amount').value = totalFee;
+    document.getElementById('fee-description').value = description;
+
+    // Change UI state
+    document.getElementById('fee-modal-title').textContent = 'Edit Fee Structure';
+
+    const modal = document.getElementById('add-fee-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+async function handleFeeSubmit(e) {
+    e.preventDefault();
+    const classId = document.getElementById('fee-class-select').value;
+    const totalFee = document.getElementById('fee-total-amount').value;
+    const description = document.getElementById('fee-description').value;
+
+    if (!classId) return showToast('Please select a class', 'error');
+
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch('/api/fees/class-fees', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ classId, totalFee, description })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('Fee structure saved successfully!', 'success');
+            closeModal('add-fee-modal');
+            loadFeeStructures();
+        } else {
+            showToast(result.message || 'Failed to save', 'error');
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+    }
+}
+
+async function deleteFeeStructure(id) {
+    if (!confirm('Are you sure you want to delete this fee structure?')) return;
+
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch(`/api/fees/class-fees/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            showToast('Deleted successfully', 'success');
+            loadFeeStructures();
+        } else {
+            showToast(result.message, 'error');
+        }
+    } catch (e) {
+        showToast('Network error', 'error');
+    }
+}
+
+// OVERVIEW AND PAYMENTS UI
+
+function renderPaymentUpdates() {
+    return `
+        <div class="applications-stats-grid" id="payment-stats-grid">
+            <div class="app-stat-card">
+                <div class="app-stat-icon" style="background:#eff6ff; color:#3b82f6;">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="app-stat-content">
+                    <span class="app-stat-value" id="pay-stat-total">...</span>
+                    <span class="app-stat-label">Total Expected (₹)</span>
+                </div>
+            </div>
+            <div class="app-stat-card approved">
+                <div class="app-stat-icon">
+                    <i class="fas fa-hand-holding-usd"></i>
+                </div>
+                <div class="app-stat-content">
+                    <span class="app-stat-value" id="pay-stat-collected">...</span>
+                    <span class="app-stat-label">Total Collected (₹)</span>
+                </div>
+            </div>
+            <div class="app-stat-card pending">
+                <div class="app-stat-icon">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+                <div class="app-stat-content">
+                    <span class="app-stat-value" id="pay-stat-pending">...</span>
+                    <span class="app-stat-label">Total Pending (₹)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-card applications-card" style="margin-top: 20px;">
+            <div class="applications-header">
+                <div class="applications-title">
+                    <i class="fas fa-credit-card"></i>
+                    <h2>Student Payments Overview</h2>
+                </div>
+                <div class="applications-controls">
+                    <select id="payment-class-filter" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; min-width: 150px; background: white; cursor: pointer; z-index: 10;" onchange="loadStudentPayments()">
+                        <option value="">All Classes</option>
+                    </select>
+                    <select id="payment-status-filter" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; min-width: 150px; background: white; cursor: pointer; z-index: 10;" onchange="loadStudentPayments()">
+                        <option value="all">All Status</option>
+                        <option value="paid">Paid</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                    <button class="btn-refresh" onclick="loadStudentPayments()" style="padding: 10px 15px; border-radius: 8px;">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button class="btn-primary" onclick="downloadFilteredReceipts()" style="padding: 10px 15px; border-radius: 8px; background: #0A66FF; color: white; border: none; font-weight: 500;">
+                        <i class="fas fa-file-download"></i> Download Receipts
+                    </button>
+                </div>
+            </div>
+            <div class="table-wrapper" style="margin-top: 25px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <table class="data-table applications-table">
+                    <thead>
+                        <tr>
+                            <th style="padding: 15px; text-align: left;">Student Name</th>
+                            <th style="padding: 15px; text-align: left;">Class</th>
+                            <th style="padding: 15px; text-align: left;">Total Fees</th>
+                            <th style="padding: 15px; text-align: left;">Payment Status</th>
+                            <th style="padding: 15px; text-align: left;">Payment Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="student-payments-body">
+                        <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading students...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function initializePaymentUpdates() {
+    populatePaymentClassFilter();
+    loadStudentPayments();
+    refreshPaymentDashboardStats();
+}
+
+async function populatePaymentClassFilter() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/class-subjects/classes', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.success && result.data) {
+            const select = document.getElementById('payment-class-filter');
+            select.innerHTML = '<option value="">All Classes</option>' + result.data.map(cls => `<option value="${cls._id}">${cls.name || 'Class ' + cls.class}</option>`).join('');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function refreshPaymentDashboardStats() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/payments/collection-overview', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.success && result.data) {
+            document.getElementById('pay-stat-total').textContent = result.data.totalExpected.toLocaleString();
+            document.getElementById('pay-stat-collected').textContent = result.data.totalCollected.toLocaleString();
+            document.getElementById('pay-stat-pending').textContent = result.data.totalPending.toLocaleString();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function loadStudentPayments() {
+    const classId = document.getElementById('payment-class-filter').value;
+    const status = document.getElementById('payment-status-filter').value;
+    const tbody = document.getElementById('student-payments-body');
+    const token = localStorage.getItem('token');
+
+    let url = '/api/payments/students?';
+    if (classId) url += `class_id=${classId}&`;
+    if (status && status !== 'all') url += `status=${status}&`;
+
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (result.success && result.data && result.data.length > 0) {
+            // Cache current student list for bulk receipt download
+            window.currentFilteredStudents = result.data.map(s => s.student_id);
+
+            tbody.innerHTML = result.data.map(student => {
+                const total = student.total_fees || 0;
+                const badgeClass = student.status === 'paid' ? 'approved' : 'pending';
+                const statusLabel = student.status === 'paid' ? 'Paid' : 'Pending';
+                const pDate = student.payment_date ? new Date(student.payment_date).toLocaleDateString() : '-';
+
+                return `
+                <tr>
+                    <td style="padding: 15px; font-weight: 500;">${student.student_name}</td>
+                    <td style="padding: 15px;">Class ${student.class}</td>
+                    <td style="padding: 15px;">₹${total.toLocaleString()}</td>
+                    <td style="padding: 15px;"><span class="status-badge ${badgeClass}">${statusLabel}</span></td>
+                    <td style="padding: 15px; color: #64748b;">${pDate}</td>
+                </tr>
+                `;
+            }).join('');
+        } else {
+            window.currentFilteredStudents = [];
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 40px; color: #64748b;">No students found matching your filters.</td></tr>`;
+        }
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: red;">Failed to load student payments.</td></tr>`;
+    }
+}
+
+async function markPaymentAsPaid(studentId) {
+    if (!confirm('Mark full payment automatically for this student?')) return;
+
+    const token = localStorage.getItem('token');
+    try {
+        const res = await fetch('/api/payments/update-student-payment', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ studentId })
+        });
+
+        const result = await res.json();
+        if (result.success) {
+            showToast('Payment marked as paid state overridden!', 'success');
+            loadStudentPayments();
+            refreshPaymentDashboardStats();
+        } else {
+            showToast(result.message, 'error');
+        }
+    } catch (e) {
+        showToast('Network error', 'error');
+    }
+}
+
+async function downloadAdminReceipt(studentId) {
+    try {
+        showToast("Generating receipt...", "info");
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/payments/admin-receipt/${studentId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+
+        if (!result.success) throw new Error(result.message);
+
+        const data = result.data;
+        const html = `
+            <div style="padding: 40px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; background: #fff;">
+                <div style="border-bottom: 2px solid #0A66FF; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <h1 style="color: #0A66FF; margin: 0 0 5px 0;">Smart School System</h1>
+                        <p style="margin: 0; color: #666;">Fees Payment Receipt</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h2 style="margin: 0; color: #333;">RECEIPT</h2>
+                        <b style="color: #666; font-size: 14px;">#${data.receiptNumber}</b><br>
+                        <span style="color: #666; font-size: 14px;">Date: ${new Date(data.paymentDate).toLocaleDateString()}</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                    <div>
+                        <h4 style="margin: 0 0 10px 0; color: #666; text-transform: uppercase;">Student Details</h4>
+                        <p style="margin: 0 0 5px 0;"><strong>Name:</strong> ${data.studentName}</p>
+                        <p style="margin: 0 0 5px 0;"><strong>Class:</strong> ${data.className}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h4 style="margin: 0 0 10px 0; color: #666; text-transform: uppercase;">Payment Info</h4>
+                        <p style="margin: 0 0 5px 0;"><strong>Method:</strong> ${data.paymentMethod}</p>
+                        <p style="margin: 0 0 5px 0;"><strong>Transaction ID:</strong> ${data.transactionId}</p>
+                    </div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-top: 40px;">
+                    <thead>
+                        <tr style="background: #f8fafc;">
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Description</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Class</th>
+                            <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e2e8f0;">Amount Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0;">Class Fees</td>
+                            <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0;">${data.className}</td>
+                            <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">₹${data.paidAmount}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                    <table style="width: 300px;">
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold; font-size: 18px; color: #0f172a;">Total Paid:</td>
+                            <td style="padding: 8px; text-align: right; font-weight: bold; font-size: 18px; color: #10b981;">₹${data.paidAmount}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="margin-top: 60px; text-align: center; color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                    <p>This is a computer-generated receipt and does not require a physical signature.</p>
+                </div>
+            </div>
+        `;
+
+        const opt = {
+            margin: 0.5,
+            filename: `Admin_Receipt_${data.receiptNumber}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        const container = document.createElement('div');
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        await html2pdf().set(opt).from(container).save();
+        document.body.removeChild(container);
+
+    } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Failed to download receipt', "error");
+    }
+}
+async function downloadFilteredReceipts() {
+    try {
+        const studentIds = window.currentFilteredStudents;
+        if (!studentIds || studentIds.length === 0) {
+            return showToast("No students in current filter to download receipts for.", "warning");
+        }
+
+        showToast("Generating bulk receipts...", "info");
+        const token = localStorage.getItem('token');
+
+        const res = await fetch('/api/payments/bulk-receipts', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ studentIds })
+        });
+
+        const result = await res.json();
+        if (!result.success) throw new Error(result.message);
+
+        const receipts = result.data;
+        if (receipts.length === 0) return showToast("No paid receipts found for filtered students.", "warning");
+
+        const container = document.createElement('div');
+
+        // Build a long HTML with all receipts
+        let bulkHtml = '';
+        receipts.forEach((data, index) => {
+            bulkHtml += `
+                <div style="padding: 40px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto; background: #fff; ${index > 0 ? 'page-break-before: always;' : ''}">
+                    <div style="border-bottom: 2px solid #0A66FF; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <h1 style="color: #0A66FF; margin: 0 0 5px 0;">Smart School System</h1>
+                            <p style="margin: 0; color: #666;">Fees Payment Receipt</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <h2 style="margin: 0; color: #333;">RECEIPT</h2>
+                            <b style="color: #666; font-size: 14px;">#${data.receiptNumber}</b><br>
+                            <span style="color: #666; font-size: 14px;">Date: ${new Date(data.paymentDate).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                        <div>
+                            <h4 style="margin: 0 0 10px 0; color: #666; text-transform: uppercase;">Student Details</h4>
+                            <p style="margin: 0 0 5px 0;"><strong>Name:</strong> ${data.studentName}</p>
+                            <p style="margin: 0 0 5px 0;"><strong>Class:</strong> ${data.className}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <h4 style="margin: 0 0 10px 0; color: #666; text-transform: uppercase;">Payment Info</h4>
+                            <p style="margin: 0 0 5px 0;"><strong>Method:</strong> ${data.paymentMethod}</p>
+                            <p style="margin: 0 0 5px 0;"><strong>Academic Year:</strong> ${data.academicYear}</p>
+                        </div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 40px;">
+                        <thead>
+                            <tr style="background: #f8fafc;">
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Description</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Class</th>
+                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e2e8f0;">Amount Paid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0;">Class Fees</td>
+                                <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0;">${data.className}</td>
+                                <td style="padding: 15px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">₹${data.paidAmount.toLocaleString()}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                        <table style="width: 300px;">
+                            <tr>
+                                <td style="padding: 8px; font-weight: bold; font-size: 18px; color: #0f172a;">Total Paid:</td>
+                                <td style="padding: 8px; text-align: right; font-weight: bold; font-size: 18px; color: #10b981;">₹${data.paidAmount.toLocaleString()}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="margin-top: 60px; text-align: center; color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                        <p>This is a computer-generated receipt and does not require a physical signature.</p>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = bulkHtml;
+        document.body.appendChild(container);
+
+        const opt = {
+            margin: 0.5,
+            filename: `Fees_Receipts_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(container).save();
+        document.body.removeChild(container);
+        showToast("Bulk receipts downloaded successfully!", "success");
+
+    } catch (err) {
+        console.error(err);
+        showToast("Failed to process bulk download.", "error");
+    }
 }
