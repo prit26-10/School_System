@@ -7,6 +7,7 @@
     <title>Student Dashboard - SmartSchool</title>
     <link rel="stylesheet" href="/css/common-dashboard.css">
     <link rel="stylesheet" href="/student/css/studentDashboard.css">
+    <link rel="stylesheet" href="/student/css/proctoring.css">
     <link rel="stylesheet" href="/css/academic-calendar.css">
     <link rel="stylesheet" href="/reset-password/reset-password.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -633,10 +634,33 @@
                     </div>
                 </div>
                 <div id="page-view-result" class="page-section">
-                    <div class="placeholder-page">
-                        <div class="placeholder-icon"><i class="fas fa-poll"></i></div>
-                        <h3>View Results</h3>
-                        <p>Review compiled results for your assigned subjects.</p>
+                    <div class="eval-result-page" style="background: #f8fafc; min-height: 100%; padding: 0; font-family: 'Poppins', sans-serif;">
+                        <div class="eval-result-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div>
+                                <h2 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin: 0;">My Examination Results</h2>
+                                <p style="color: #64748b; margin: 5px 0 0; font-size: 0.95rem;">Track your academic performance and detailed marks here.</p>
+                            </div>
+                            <button class="btn-refresh" onclick="loadMyResults()" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 10px 18px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s;">
+                                <i class="fas fa-sync-alt"></i> Refresh Results
+                            </button>
+                        </div>
+                        
+                        <div id="student-results-loading" style="display: none; padding: 80px 20px; text-align: center; background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #2563eb; margin-bottom: 16px;"></i>
+                            <p style="color: #64748b; font-weight: 500;">Retrieving your scorecards...</p>
+                        </div>
+                        
+                        <div id="student-results-empty" style="display: none; padding: 80px 20px; text-align: center; background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 2px dashed #e2e8f0;">
+                            <div style="width: 80px; height: 80px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                                <i class="fas fa-poll" style="font-size: 32px; color: #94a3b8;"></i>
+                            </div>
+                            <h3 style="color: #1e293b; margin-bottom: 8px; font-weight: 700;">No Results Published Yet</h3>
+                            <p style="color: #64748b; max-width: 400px; margin: 0 auto; font-size: 0.9rem; line-height: 1.5;">Your examination marks will appear here once the administration publishes them.</p>
+                        </div>
+
+                        <div id="student-results-container" style="display: flex; flex-direction: column; gap: 30px; display: none;">
+                            <!-- Populated dynamically -->
+                        </div>
                     </div>
                 </div>
 
