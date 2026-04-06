@@ -3045,7 +3045,6 @@ function renderDeleteMaterial() { return Components.EmptyState('trash-alt', 'Del
 function renderCreateLiveSession() { return Components.EmptyState('video', 'Create Live Session', 'Schedule and set up virtual classrooms.'); }
 function renderJoinSession() { return Components.EmptyState('sign-in-alt', 'Start / Join Class', 'Start or enter your scheduled live sessions.'); }
 function renderUploadPaper() { return renderExamTimetable(); }
-
 function renderGenerateLink() { return Components.EmptyState('link', 'Generate Meeting Link', 'Generate a meeting link for your live session.'); }
 function renderSendSessionNotification() { return Components.EmptyState('paper-plane', 'Send Session Notification', 'Notify students about the live session.'); }
 function renderMarkSessionAttendance() { return Components.EmptyState('user-check', 'Mark Attendance', 'Mark attendance for the live session.'); }
@@ -4355,6 +4354,7 @@ window.saveEvaluation = async function (action = 'save') {
         alert('Connection error');
     }
 };
+
 
 // Replaced by consolidated version below
 

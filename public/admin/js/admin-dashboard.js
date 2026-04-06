@@ -455,6 +455,9 @@ function loadPage(page, titleOverride = null) {
         'exam-timetable': {
             title: 'Create Exam Timetable',
             subtitle: 'Schedule exam timings',
+        'exam-timetable': {
+            title: 'Create Exam Timetable',
+            subtitle: 'Schedule exam timings',
             render: renderExamTimetable,
             init: initializeExamTimetable
         },
@@ -2312,6 +2315,7 @@ async function editStudent(studentId) {
                 },
                 body: JSON.stringify(updateData)
             });
+
             const result = await response.json();
 
             if (result.success) {

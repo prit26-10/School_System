@@ -1,0 +1,119 @@
+.main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 120px 20px 80px;
+}
+
+.success-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 50px 40px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.success-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient);
+}
+
+.success-icon {
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 200, 83, 0.12);
+    border-radius: 50%;
+    margin: 0 auto 25px;
+}
+
+.success-icon i {
+    font-size: 40px;
+    color: var(--accent);
+}
+
+.success-card h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--dark);
+    margin: 0 0 15px;
+}
+
+.success-card > p {
+    font-size: 15px;
+    color: var(--gray);
+    line-height: 1.7;
+    margin: 0 0 20px;
+}
+
+.application-id {
+    display: inline-block;
+    padding: 10px 20px;
+    background: var(--light-gray);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--dark);
+    margin-bottom: 20px;
+    font-family: 'Monaco', monospace;
+}
+
+.application-id span {
+    color: var(--primary);
+}
+
+.success-note {
+    font-size: 14px;
+    color: var(--gray);
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.success-card .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 32px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.success-card .btn i {
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 100px 16px 60px;
+    }
+
+    .success-card {
+        padding: 35px 25px;
+    }
+
+    .success-icon {
+        width: 70px;
+        height: 70px;
+    }
+
+    .success-icon i {
+        font-size: 32px;
+    }
+
+    .success-card h1 {
+        font-size: 22px;
+    }
+}

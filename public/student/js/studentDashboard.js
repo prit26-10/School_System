@@ -1187,9 +1187,9 @@ function startLiveSessionsPolling() {
             // Check if we are still on dashboard or join-session page before loading
             const dashboardActive = document.getElementById('page-dashboard')?.classList.contains('active');
             const joinActive = document.getElementById('page-join-session')?.classList.contains('active');
-            
+
             if (dashboardActive) {
-                loadTodaySchedule(); 
+                loadTodaySchedule();
             } else if (joinActive) {
                 loadLiveSessions(true);
             } else {
@@ -1859,6 +1859,7 @@ window.logout = function () {
 
 window.handleLogout = window.logout;
 
+
 window.loadTeacherAnnouncements = function () {
     loadAnnouncements();
 };
@@ -1879,6 +1880,7 @@ window.filterAssignedClasses = function () {
 window.sortAssignedClasses = function () {
     console.log('Sorting classes...');
 };
+
 
 /**
  * Utility to escape HTML and prevent XSS
@@ -1943,12 +1945,12 @@ async function loadStudentExamTimetable() {
         });
 
         let html = '<div id="student-exam-pdf-content">';
-        
+
         for (const examId in grouped) {
-            const examInfo = exams.find(e => e._id === examId) || 
-                             (timetable.find(t => (t.examId?._id || t.examId) === examId)?.examId) || 
-                             { name: 'Examination' };
-            
+            const examInfo = exams.find(e => e._id === examId) ||
+                (timetable.find(t => (t.examId?._id || t.examId) === examId)?.examId) ||
+                { name: 'Examination' };
+
             const entries = grouped[examId];
 
             html += `
@@ -2097,7 +2099,7 @@ function showToast(message, type = 'info') {
 
     msgEl.textContent = message;
     toast.className = `notification-toast visible ${type}`;
-    
+
     setTimeout(() => {
         toast.className = 'notification-toast';
     }, 4000);
@@ -2218,7 +2220,7 @@ async function openExamFormModal(timetableId) {
     currentExamTimetableId = timetableId;
     const modal = document.getElementById('exam-form-modal');
     const container = document.getElementById('exam-questions-container');
-    
+
     if (modal) modal.style.display = 'flex';
     container.innerHTML = `<div class="loading-state" style="text-align: center; padding: 60px;">
         <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
@@ -2234,12 +2236,12 @@ async function openExamFormModal(timetableId) {
         });
 
         const result = await response.json();
-        
+
         if (!result.success) {
             container.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 40px;">${result.message || 'Error loading questions.'}</div>`;
             return;
         }
-        
+
         document.getElementById('exam-form-subject').textContent = result.data.subjectName;
         document.getElementById('exam-form-title').textContent = result.data.examName;
 
@@ -2312,7 +2314,7 @@ async function submitExamAnswers() {
 
     const answerInputs = document.querySelectorAll('.exam-answer-input');
     const answers = [];
-    
+
     // Validate that all questions have at least some text
     let allFilled = true;
     answerInputs.forEach(input => {
@@ -2341,7 +2343,7 @@ async function submitExamAnswers() {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/student/submit-exam/${currentExamTimetableId}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
@@ -2349,7 +2351,7 @@ async function submitExamAnswers() {
         });
 
         const result = await response.json();
-        
+
         if (result.success) {
             showToast("Exam submitted successfully!", "success");
             const modal = document.getElementById('exam-form-modal');

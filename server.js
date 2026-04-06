@@ -70,6 +70,7 @@ app.use("/api/assign", require("./routes/assignRoutes"));
 app.use("/api/academic-year", require("./routes/academicYearRoutes"));
 app.use("/api/assignments", require("./routes/assignmentRoutes"));
 app.use("/api/live-session", require("./routes/liveSessionRoutes"));
+
 app.use("/api/exams", require("./routes/examRoutes"));
 
 // Static Files

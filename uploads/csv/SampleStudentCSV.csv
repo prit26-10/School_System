@@ -1,0 +1,2 @@
+name,email,password,age,class,city,state,country,timezone,mobileNumber,userId
+John Doe,john@example.com,password123,20,BCA,New York,NY,USA,America/New_York,1234567890,s001

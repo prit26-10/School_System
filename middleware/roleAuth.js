@@ -4,6 +4,7 @@ module.exports = (...allowedRoles) => (req, res, next) => {
     return res.status(401).json({ message: "Not authenticated" });
   }
 
+
   // Flatten in case allowedRoles is an array of arrays
   const roles = allowedRoles.flat();
 
