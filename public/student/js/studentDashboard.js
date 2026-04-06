@@ -14,6 +14,19 @@ let academicData = [];
 let currentFilterType = 'all';
 let liveSessionsInterval = null;
 
+// Proctoring Global State
+let proctorState = {
+    isExamActive: false,
+    startTime: null,
+    duration: 0, // In minutes
+    timeLeft: 0, // In seconds
+    timerInterval: null,
+    stream: null,
+    timetableId: null,
+    examData: null,
+    violations: 0
+};
+
 document.addEventListener('DOMContentLoaded', function () {
     // Check if student is logged in
     const token = localStorage.getItem('token');
@@ -247,8 +260,8 @@ function loadPageData(pageId) {
             loadLiveSessions();
             startLiveSessionsPolling(); // Start polling
             break;
-        case 'view-results':
-            loadResults();
+        case 'view-result':
+            loadMyResults();
             break;
         case 'exam-timetable':
             loadStudentExamTimetable();
@@ -292,18 +305,20 @@ async function loadTodaySchedule() {
 
     const token = localStorage.getItem('token');
     try {
-        const [timetableRes, sessionsRes] = await Promise.all([
+        const [timetableRes, sessionsRes, examsRes] = await Promise.all([
             fetch('/api/students/me/timetable', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/api/live-session/today', { headers: { 'Authorization': `Bearer ${token}` } })
+            fetch('/api/live-session/today', { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch('/api/exams/student/available-exams', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
-        if (timetableRes.status === 401 || sessionsRes.status === 401) {
+        if (timetableRes.status === 401 || sessionsRes.status === 401 || examsRes.status === 401) {
             window.location.href = '/login';
             return;
         }
 
         const timetableResult = await timetableRes.json();
         const sessionsResult = await sessionsRes.json();
+        const examsResult = await examsRes.json();
 
         if (!timetableResult.success || !timetableResult.data || !timetableResult.data.timetable) {
             container.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">No schedule found for today.</div>`;
@@ -312,18 +327,30 @@ async function loadTodaySchedule() {
 
         const timetableGrid = timetableResult.data.timetable;
         const liveSessions = sessionsResult.success ? (sessionsResult.data || []) : [];
+        const todayExams = examsResult.success ? (examsResult.data || []).filter(e => e.isToday) : [];
 
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const todayDay = days[new Date().getDay()];
         const todayClasses = timetableGrid[todayDay] || [];
 
-        if (todayClasses.length === 0) {
-            container.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">No classes scheduled for today (${todayDay}).</div>`;
+        if (todayClasses.length === 0 && todayExams.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">No classes or exams scheduled for today (${todayDay}).</div>`;
             return;
         }
 
-        // Sort chronologically
-        todayClasses.sort((a, b) => {
+        // Sort chronologically (merge classes and exams)
+        const combinedSchedule = [
+            ...todayClasses.map(c => ({ ...c, type: 'class' })),
+            ...todayExams.map(e => ({ 
+                subjectName: e.subjectName, 
+                startTime: e.startTime, 
+                endTime: e.endTime, 
+                type: 'exam',
+                examId: e._id 
+            }))
+        ];
+
+        combinedSchedule.sort((a, b) => {
             const timeA = new Date(`1970/01/01 ${a.startTime}`).getTime();
             const timeB = new Date(`1970/01/01 ${b.startTime}`).getTime();
             return timeA - timeB;
@@ -331,11 +358,30 @@ async function loadTodaySchedule() {
 
         const classNameDisplay = currentUser && currentUser.class ? `Class ${currentUser.class}` : 'Your Class';
 
-        container.innerHTML = todayClasses.map(cls => {
+        const numericClass = currentUser && (currentUser.class || currentUser.studentData?.class) ? (currentUser.class || currentUser.studentData?.class) : 'N/A';
+ 
+        container.innerHTML = combinedSchedule.map(item => {
+            if (item.type === 'exam') {
+                return `
+                    <div class="schedule-item" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #fff1f2; border: 1.5px solid #fecaca; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(225, 29, 72, 0.05);">
+                        <div style="display: flex; align-items: center; gap: 20px; flex: 1;">
+                            <div class="schedule-time" style="min-width: 85px; font-weight: 700; color: #e11d48; font-size: 14px;">${item.startTime}</div>
+                            <div class="schedule-info">
+                                <div style="font-weight: 700; color: #1e293b; font-size: 15px; margin-bottom: 2px;">${item.subjectName} <span style="background: #e11d48; color: white; font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">EXAM</span></div>
+                                <div style="color: #64748b; font-size: 12px; font-weight: 500;">Class: <span style="color: #334155; font-weight: 600;">${numericClass}</span></div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <button class="btn-join" onclick="const attendBtn = document.querySelector('.nav-item[data-page=\'attend-exam\']'); if(attendBtn) attendBtn.click();" style="padding: 6px 16px; border-radius: 20px; border: none; background: #e11d48; color: white; font-size: 12px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(225, 29, 72, 0.2); transition: all 0.2s;">View Exam</button>
+                        </div>
+                    </div>
+                `;
+            }
+
             // Match with live session
             const liveSession = liveSessions.find(s =>
-                s.subjectName?.trim().toLowerCase() === cls.subjectName?.trim().toLowerCase() &&
-                s.startTime?.trim() === cls.startTime?.trim()
+                s.subjectName?.trim().toLowerCase() === item.subjectName?.trim().toLowerCase() &&
+                s.startTime?.trim() === item.startTime?.trim()
             );
 
             const isLive = liveSession && liveSession.status === 'live';
@@ -351,14 +397,12 @@ async function loadTodaySchedule() {
                 statusStyle = 'color: #10b981;';
             }
 
-            const numericClass = currentUser && currentUser.class ? currentUser.class : 'N/A';
-
             return `
                 <div class="schedule-item" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
                     <div style="display: flex; align-items: center; gap: 20px; flex: 1;">
-                        <div class="schedule-time" style="min-width: 85px; font-weight: 700; color: #2563eb; font-size: 14px;">${cls.startTime}</div>
+                        <div class="schedule-time" style="min-width: 85px; font-weight: 700; color: #2563eb; font-size: 14px;">${item.startTime}</div>
                         <div class="schedule-info">
-                            <div style="font-weight: 600; color: #1e293b; font-size: 15px; margin-bottom: 2px;">${cls.subjectName}</div>
+                            <div style="font-weight: 600; color: #1e293b; font-size: 15px; margin-bottom: 2px;">${item.subjectName}</div>
                             <div style="color: #64748b; font-size: 12px; font-weight: 500;">Class: <span style="color: #334155; font-weight: 600;">${numericClass}</span></div>
                         </div>
                     </div>
@@ -2076,7 +2120,7 @@ async function loadAvailableExams() {
 
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/students/me/available-exams', {
+        const response = await fetch('/api/exams/student/available-exams', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -2086,37 +2130,83 @@ async function loadAvailableExams() {
         }
 
         const result = await response.json();
+        const studentClassInfo = result.studentClass ? `Class ${result.studentClass}` : 'No Class Detected';
 
         if (!result.success || !Array.isArray(result.data) || result.data.length === 0) {
-            container.innerHTML = `<div style="text-align: center; padding: 40px; color: #94a3b8; grid-column: 1 / -1;">
-                <i class="fas fa-laptop-code" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
-                <p>No exams currently available to attend.</p>
+            container.innerHTML = `<div style="text-align: center; padding: 60px; color: #94a3b8; grid-column: 1 / -1; background: #f8fafc; border-radius: 16px; border: 2px dashed #e2e8f0;">
+                <div style="width: 80px; height: 80px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <i class="fas fa-laptop-code" style="font-size: 32px; color: #cbd5e1;"></i>
+                </div>
+                <h3 style="color: #475569; font-size: 18px; margin-bottom: 8px;">No Exams Found</h3>
+                <p style="font-size: 14px; margin-bottom: 4px;">We couldn't find any exams scheduled for your profile.</p>
+                <div style="display: inline-block; margin-top: 12px; padding: 6px 16px; background: #eff6ff; color: #3b82f6; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid #dbeafe;">
+                    Detected: ${escapeHtml(studentClassInfo)}
+                </div>
             </div>`;
             return;
         }
 
-        container.innerHTML = result.data.map(exam => `
-            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between;">
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                        <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">${escapeHtml(exam.subjectName)}</h4>
-                        ${exam.isSubmitted 
-                            ? `<span style="background: #ecfdf5; color: #047857; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #d1fae5;">Submitted</span>`
-                            : `<span style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #bae6fd;">Available</span>`
-                        }
+        container.innerHTML = result.data.map(exam => {
+            const dateStr = new Date(exam.date).toLocaleDateString();
+            let btnText = '<i class="fas fa-pen-alt"></i> Attend Exam';
+            let btnColor = exam.isToday ? '#ef4444' : '#2563eb';
+            let btnDisabled = false;
+            let statusLabel = '';
+            
+            if (exam.isSubmitted) {
+                statusLabel = `<span style="background: #ecfdf5; color: #047857; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #d1fae5;">Submitted</span>`;
+                btnText = '<i class="fas fa-check"></i> Already Submitted';
+                btnColor = '#cbd5e1';
+                btnDisabled = true;
+            } else if (!exam.hasQuestions) {
+                statusLabel = `<span style="background: #fff7ed; color: #c2410c; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #ffedd5;">Ready Soon</span>`;
+                btnText = '<i class="fas fa-clock"></i> Questions Pending';
+                btnColor = '#94a3b8';
+                btnDisabled = true;
+            } else if (exam.isToday) {
+                statusLabel = `<span style="background: #fef2f2; color: #ef4444; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #fee2e2;">Live Now</span>`;
+            } else if (exam.isUpcoming) {
+                statusLabel = `<span style="background: #f8fafc; color: #64748b; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0;">Upcoming</span>`;
+                btnText = '<i class="fas fa-calendar-alt"></i> Upcoming';
+                btnColor = '#64748b';
+                btnDisabled = true;
+            } else if (exam.isPast) {
+                statusLabel = `<span style="background: #f1f5f9; color: #94a3b8; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0;">Ended</span>`;
+                btnText = '<i class="fas fa-history"></i> Exam Over';
+                btnColor = '#cbd5e1';
+                btnDisabled = true;
+            }
+
+            const onClickAction = exam.isOnlineExam ? `openOnlineExamZone('${exam._id}')` : `openExamFormModal('${exam._id}')`;
+
+            return `
+                <div style="background: white; border: ${exam.isToday ? '2px solid #ef4444' : '1px solid #e2e8f0'}; border-radius: 16px; padding: 24px; box-shadow: ${exam.isToday ? '0 10px 25px -5px rgba(239, 68, 68, 0.1), 0 8px 10px -6px rgba(239, 68, 68, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)'}; display: flex; flex-direction: column; justify-content: space-between; position: relative; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';" onmouseout="this.style.transform='none';">
+                    ${exam.isToday ? `<div style="position: absolute; top: -10px; left: 24px; background: #ef4444; color: white; padding: 4px 14px; border-radius: 30px; font-size: 11px; font-weight: 800; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2); text-transform: uppercase; letter-spacing: 0.5px; border: 2px solid white;">Today's Exam</div>` : ''}
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                            <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b; line-height: 1.4;">${escapeHtml(exam.subjectName)}</h4>
+                            ${statusLabel}
+                        </div>
+                        <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b; font-weight: 500;">
+                            <i class="fas fa-file-alt" style="margin-right: 6px; color: #cbd5e1;"></i>Type: <strong style="color: #334155;">${exam.isOnlineExam ? 'Online CBT' : 'Paper Based'}</strong>
+                        </p>
+                        <div style="font-size: 13px; color: #475569; margin-bottom: 24px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                            <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <i class="far fa-calendar" style="width: 16px; margin-right: 10px; color: #94a3b8;"></i>
+                                <span><strong>Date:</strong> ${dateStr}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <i class="far fa-clock" style="width: 16px; margin-right: 10px; color: #94a3b8;"></i>
+                                <span><strong>Time:</strong> ${exam.startTime} - ${exam.endTime}</span>
+                            </div>
+                        </div>
                     </div>
-                    <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b;">Exam: <strong>${escapeHtml(exam.examName)}</strong></p>
-                    <div style="font-size: 12.5px; color: #475569; margin-bottom: 16px; background: #f8fafc; padding: 12px; border-radius: 8px;">
-                        <div><strong>Date:</strong> ${new Date(exam.date).toLocaleDateString()}</div>
-                        <div style="margin-top: 4px;"><strong>Time:</strong> ${exam.startTime} - ${exam.endTime}</div>
-                        <div style="margin-top: 4px;"><strong>Duration:</strong> ${exam.duration} mins</div>
-                    </div>
+                    <button class="btn btn-primary" onclick="${onClickAction}" ${btnDisabled ? 'disabled' : ''} style="width: 100%; border-radius: 12px; font-weight: 700; padding: 12px; background: ${btnColor}; border: none; color: white; cursor: ${btnDisabled ? 'not-allowed' : 'pointer'}; box-shadow: ${btnDisabled ? 'none' : '0 4px 10px rgba(0,0,0,0.1)'}; transition: background 0.2s;">
+                        ${btnText}
+                    </button>
                 </div>
-                <button class="btn btn-primary" onclick="openExamFormModal('${exam._id}')" ${exam.isSubmitted ? 'disabled' : ''} style="width: 100%; border-radius: 8px; font-weight: 600; padding: 10px; background: ${exam.isSubmitted ? '#cbd5e1' : '#2563eb'}; border: none; cursor: ${exam.isSubmitted ? 'not-allowed' : 'pointer'};">
-                    ${exam.isSubmitted ? '<i class="fas fa-check"></i> Already Submitted' : '<i class="fas fa-pen-alt"></i> Attend Exam'}
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
     } catch (error) {
         console.error('Error fetching available exams:', error);
@@ -2139,7 +2229,7 @@ async function openExamFormModal(timetableId) {
 
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`/api/students/me/exam-questions/${timetableId}`, {
+        const response = await fetch(`/api/exams/student/exam-questions/${timetableId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -2154,20 +2244,52 @@ async function openExamFormModal(timetableId) {
         document.getElementById('exam-form-title').textContent = result.data.examName;
 
         const questions = result.data.questions || [];
-        if (questions.length === 0) {
-             container.innerHTML = `<div style="text-align: center; color: #94a3b8; padding: 40px;">No questions defined for this exam.</div>`;
-             return;
+        const questionPaper = result.data.questionPaper;
+        
+        let questionsHtml = '';
+        
+        if (questionPaper) {
+            questionsHtml += `
+                <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
+                    <div style="width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);">
+                        <i class="fas fa-file-pdf" style="font-size: 20px; color: #2563eb;"></i>
+                    </div>
+                    <h5 style="margin: 0 0 8px 0; color: #1e293b; font-size: 15px; font-weight: 700;">Question Paper Ready</h5>
+                    <p style="margin: 0 0 16px 0; color: #64748b; font-size: 13px;">Please download the question paper before you begin.</p>
+                    <a href="/${questionPaper}" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+                        <i class="fas fa-download"></i> View / Download Paper
+                    </a>
+                </div>
+            `;
         }
 
-        container.innerHTML = questions.map((q, idx) => `
-            <div class="exam-question-item" data-id="${q._id}" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                    <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b; line-height: 1.5;">${idx + 1}. ${escapeHtml(q.questionText)}</h5>
-                    <span style="font-size: 12px; font-weight: 600; color: #3b82f6; background: #eff6ff; padding: 4px 8px; border-radius: 6px; white-space: nowrap; margin-left: 12px;">${q.maxMarks} Marks</span>
+        if (questions.length === 0) {
+            if (questionPaper) {
+                // If there's a paper but no structured questions, show a general answer textarea
+                questionsHtml += `
+                    <div class="exam-question-item" data-id="general" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                        <label style="display: block; margin-bottom: 12px; font-weight: 700; color: #1e293b; font-size: 14.5px;">Your Answer / Student Sheet</label>
+                        <p style="color: #64748b; font-size: 13px; margin-bottom: 16px;">Type your detailed answer or summarize your answer sheet below.</p>
+                        <textarea class="exam-answer-input" data-id="general" rows="12" placeholder="Type your answers for all questions here..." style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 15px; font-size: 14.5px; font-family: inherit; line-height: 1.6; resize: vertical;" required></textarea>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `<div style="text-align: center; color: #94a3b8; padding: 40px;">No questions defined for this exam.</div>`;
+                return;
+            }
+        } else {
+            questionsHtml += questions.map((q, idx) => `
+                <div class="exam-question-item" data-id="${q._id}" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                        <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b; line-height: 1.5;">${idx + 1}. ${escapeHtml(q.questionText)}</h5>
+                        <span style="font-size: 12px; font-weight: 600; color: #3b82f6; background: #eff6ff; padding: 4px 8px; border-radius: 6px; white-space: nowrap; margin-left: 12px;">${q.maxMarks} Marks</span>
+                    </div>
+                    <textarea class="exam-answer-input" data-id="${q._id}" rows="5" placeholder="Type your answer here..." style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; margin-top: 8px;" required></textarea>
                 </div>
-                <textarea class="exam-answer-input" data-id="${q._id}" rows="5" placeholder="Type your answer here..." style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; margin-top: 8px;" required></textarea>
-            </div>
-        `).join('');
+            `).join('');
+        }
+
+        container.innerHTML = questionsHtml;
         
         document.getElementById('submit-exam-btn').disabled = false;
 
@@ -2217,7 +2339,7 @@ async function submitExamAnswers() {
 
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`/api/students/me/submit-exam/${currentExamTimetableId}`, {
+        const response = await fetch(`/api/exams/student/submit-exam/${currentExamTimetableId}`, {
             method: 'POST',
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -2245,5 +2367,636 @@ async function submitExamAnswers() {
         showToast("Error submitting exam.", "error");
         btn.innerHTML = originalText;
         btn.disabled = false;
+    }
+}
+
+// ────────────────────────────────────────────────
+// ONLINE (CSV) EXAM ZONE LOGIC
+// ────────────────────────────────────────────────
+
+async function openOnlineExamZone(timetableId) {
+    if (!timetableId) return;
+    
+    // Redirect to the new dedicated exam environment
+    // This ensures a clean, isolated session from the start
+    window.location.href = `/exam/exam.html?id=${encodeURIComponent(timetableId)}`;
+}
+
+/*
+// Legacy Modal Logic (Deprecated)
+async function _old_openOnlineExamZone(timetableId) {
+    currentExamTimetableId = timetableId;
+    proctorState.timetableId = timetableId;
+    
+    const modal = document.getElementById('exam-form-modal');
+    const container = document.getElementById('exam-questions-container');
+    
+    if (modal) modal.style.display = 'flex';
+    container.innerHTML = `<div style="text-align: center; padding: 60px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6;"></i><p>Establishing secure connection...</p></div>`;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/student/csv-exam-paper/${timetableId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            proctorState.examData = result.data;
+            proctorState.duration = result.data.duration || 60; // Default 60 mins if missing
+            renderExamInstructions(result.data);
+        } else {
+            container.innerHTML = `<div style="text-align: center; color: red; padding: 40px;">${result.message}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading online exam:', error);
+        container.innerHTML = `<div style="text-align: center; color: red; padding: 40px;">Connection error</div>`;
+    }
+}
+*/
+
+
+function renderExamInstructions(data) {
+    const container = document.getElementById('exam-questions-container');
+    document.getElementById('exam-form-subject').textContent = data.subjectName;
+    document.getElementById('exam-form-title').textContent = (data.examName || 'Online Exam');
+
+    container.innerHTML = `
+        <div class="instruction-hero">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #1e293b;">Examination Instructions</h2>
+            <div class="rule-list">
+                <div class="rule-item">
+                    <div class="rule-icon"><i class="fas fa-expand"></i></div>
+                    <div>
+                        <strong>Full-Screen Mode Required</strong>
+                        <p style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">The exam will only run in full-screen. Exiting will cause immediate submission.</p>
+                    </div>
+                </div>
+                <div class="rule-item">
+                    <div class="rule-icon"><i class="fas fa-window-restore"></i></div>
+                    <div>
+                        <strong>No Tab Switching</strong>
+                        <p style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">Switching tabs or windows is considered malpractice and will auto-submit the exam.</p>
+                    </div>
+                </div>
+                <div class="rule-item">
+                    <div class="rule-icon"><i class="fas fa-video"></i></div>
+                    <div>
+                        <strong>Live Camera Proctoring</strong>
+                        <p style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">Camera must be active throughout. Blur detection is active.</p>
+                    </div>
+                </div>
+                <div class="rule-item">
+                    <div class="rule-icon"><i class="fas fa-clock"></i></div>
+                    <div>
+                        <strong>Auto-Submit Timer</strong>
+                        <p style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">Duration: ${proctorState.duration} Minutes. Auto-submits on timeout.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #eff6ff; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+                <h4 style="margin-bottom: 15px; font-size: 1rem;"><i class="fas fa-camera"></i> Camera Verification</h4>
+                <div id="camera-loading-state" style="text-align: center; padding: 20px;">
+                    <i class="fas fa-spinner fa-spin"></i> Initializing camera...
+                </div>
+                <div id="camera-preview-container" style="display: none;">
+                    <div class="camera-preview-zone">
+                        <video id="proctor-video-feed" autoplay playsinline muted></video>
+                    </div>
+                    <p style="text-align: center; font-size: 0.85rem; color: #3b82f6; margin-top: 10px;">Please ensure your face is clearly visible.</p>
+                </div>
+                <div id="camera-error-state" style="display: none; color: #ef4444; padding: 10px; text-align: center; font-weight: 600;">
+                    <i class="fas fa-exclamation-triangle"></i> Camera permission denied. Please enable camera to start.
+                </div>
+            </div>
+
+            <button id="btn-start-exam" class="btn btn-primary" onclick="initiateExamStart()" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px;" disabled>
+                <i class="fas fa-play"></i> Start Guided Exam
+            </button>
+        </div>
+    `;
+
+    // Try to get camera
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            proctorState.stream = stream;
+            const video = document.getElementById('proctor-video-feed');
+            if (video) {
+                video.srcObject = stream;
+                document.getElementById('camera-loading-state').style.display = 'none';
+                document.getElementById('camera-preview-container').style.display = 'block';
+                document.getElementById('btn-start-exam').disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error("Camera access failed:", err);
+            document.getElementById('camera-loading-state').style.display = 'none';
+            document.getElementById('camera-error-state').style.display = 'block';
+        });
+
+    // Hide standard submit button during instructions
+    const submitBtn = document.getElementById('submit-exam-btn');
+    if (submitBtn) submitBtn.style.display = 'none';
+}
+
+async function initiateExamStart() {
+    if (!proctorState.stream) return;
+
+    try {
+        // Step 1: Request Fullscreen
+        if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+        }
+
+        // Step 2: Initialize Proctoring Observers
+        document.addEventListener('fullscreenchange', handleFullscreenExitDetection);
+        document.addEventListener('visibilitychange', handleVisibilityChangeDetection);
+        
+        // Step 3: Setup UI for Exam mode
+        document.body.classList.add('exam-mode-active');
+        proctorState.isExamActive = true;
+        proctorState.timeLeft = proctorState.duration * 60;
+        
+        // Step 4: Render Questions & Start Timer
+        startExamTimer();
+        renderProctoredQuestions();
+        
+        // Step 5: Setup Camera Monitoring
+        startCameraMonitoring();
+
+        showToast("Secure Examination Started", "success");
+    } catch (err) {
+        console.error("Failed to start secure session:", err);
+        showToast("Full-screen mode is required to start the exam.", "danger");
+    }
+}
+
+function startExamTimer() {
+    const header = document.querySelector('.exam-form-header');
+    if (header) {
+        header.innerHTML += `
+            <div class="proctor-timer" id="floating-timer">
+                <i class="fas fa-clock"></i>
+                <span id="timer-display">--:--</span>
+            </div>
+        `;
+    }
+
+    proctorState.timerInterval = setInterval(() => {
+        proctorState.timeLeft--;
+        updateTimerDisplay();
+
+        if (proctorState.timeLeft === 300) {
+            showToast("5 Minutes Remaining!", "warning");
+        }
+
+        if (proctorState.timeLeft <= 0) {
+            clearInterval(proctorState.timerInterval);
+            forceSubmitExam("Time Out");
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const el = document.getElementById('timer-display');
+    const timerBox = document.getElementById('floating-timer');
+    if (!el) return;
+
+    const mins = Math.floor(proctorState.timeLeft / 60);
+    const secs = proctorState.timeLeft % 60;
+    el.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    if (proctorState.timeLeft < 300 && timerBox) {
+        timerBox.classList.add('low-time');
+    }
+}
+
+function renderProctoredQuestions() {
+    const container = document.getElementById('exam-questions-container');
+    const data = proctorState.examData;
+    let html = '';
+
+    data.questions.forEach((q, idx) => {
+        let optionsHtml = '';
+        if (q.questionType === 'MCQ') {
+            const options = Array.isArray(q.options) ? q.options : (q.options ? q.options.toString().split(/,|\|/) : []);
+            optionsHtml = options.map(opt => `
+                <label style="display: block; padding: 15px; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; cursor: pointer; transition: 0.2s;">
+                    <input type="radio" name="question_${q._id}" value="${escapeHtml(opt.toString().trim())}" style="margin-right: 12px;" required>
+                    <span style="font-size: 1rem;">${escapeHtml(opt.toString().trim())}</span>
+                </label>
+            `).join('');
+        } else if (q.questionType === 'TF') {
+            optionsHtml = `
+                <div style="display: flex; gap: 20px;">
+                    <label style="flex: 1; padding: 15px; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; text-align: center;">
+                        <input type="radio" name="question_${q._id}" value="TRUE" required> True
+                    </label>
+                    <label style="flex: 1; padding: 15px; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; text-align: center;">
+                        <input type="radio" name="question_${q._id}" value="FALSE" required> False
+                    </label>
+                </div>
+            `;
+        } else {
+            optionsHtml = `<textarea name="question_${q._id}" rows="6" placeholder="Type your descriptive answer..." style="width: 100%; padding: 15px; border: 1px solid #e2e8f0; border-radius: 10px; font-family: inherit; resize: vertical;" required></textarea>`;
+        }
+
+        html += `
+            <div class="proctor-question-card online-question-item" data-id="${q._id}" data-type="${q.questionType}">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                    <span style="background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">Question ${idx + 1}</span>
+                    <span style="color: #3b82f6; font-weight: 700;">${q.maxMarks} Marks</span>
+                </div>
+                <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-bottom: 25px; line-height: 1.6;">${escapeHtml(q.questionText)}</div>
+                <div class="answer-zone">${optionsHtml}</div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Show submit button in footer
+    const submitBtn = document.getElementById('submit-exam-btn');
+    if (submitBtn) {
+        submitBtn.style.display = 'inline-flex';
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Final Submission';
+        submitBtn.onclick = (e) => {
+            e.preventDefault();
+            submitProctoredExam();
+        };
+    }
+}
+
+function startCameraMonitoring() {
+    // Add cam-overlay if not exists
+    if (!document.getElementById('proctor-blur-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.id = 'proctor-blur-overlay';
+        overlay.className = 'proctor-alert-overlay';
+        overlay.style.display = 'none';
+        overlay.innerHTML = `
+            <i class="fas fa-video-slash violation-icon"></i>
+            <h1>CAMERA SIGNAL LOST</h1>
+            <p>Your screen has been blurred for security. Please turn your camera back on immediately.</p>
+            <button class="btn btn-primary" onclick="requestCameraReaccess()" style="margin-top: 20px;">Re-enable Camera</button>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    const checkInterval = setInterval(() => {
+        if (!proctorState.isExamActive) {
+            clearInterval(checkInterval);
+            return;
+        }
+
+        const videoTrack = proctorState.stream?.getVideoTracks()[0];
+        if (!videoTrack || !videoTrack.enabled || videoTrack.readyState !== 'live') {
+            document.getElementById('proctor-blur-overlay').style.display = 'flex';
+            document.getElementById('exam-questions-container').style.filter = 'blur(20px)';
+        } else {
+            document.getElementById('proctor-blur-overlay').style.display = 'none';
+            document.getElementById('exam-questions-container').style.filter = 'none';
+        }
+    }, 2000);
+}
+
+function handleFullscreenExitDetection() {
+    if (proctorState.isExamActive && !document.fullscreenElement) {
+        forceSubmitExam("Security Breach: Fullscreen exit detected");
+    }
+}
+
+function handleVisibilityChangeDetection() {
+    if (proctorState.isExamActive && document.visibilityState === 'hidden') {
+        forceSubmitExam("Security Breach: Tab switching detected");
+    }
+}
+
+async function forceSubmitExam(reason) {
+    if (!proctorState.isExamActive) return;
+    
+    showToast(`${reason}. Submitting exam...`, "danger");
+    proctorState.isExamActive = false;
+    
+    // Stop all trackers
+    cleanupProctoring();
+    
+    // Auto-save whatever is filled
+    submitProctoredExam(true, reason);
+}
+
+function cleanupProctoring() {
+    clearInterval(proctorState.timerInterval);
+    document.removeEventListener('fullscreenchange', handleFullscreenExitDetection);
+    document.removeEventListener('visibilitychange', handleVisibilityChangeDetection);
+    document.body.classList.remove('exam-mode-active');
+    
+    if (proctorState.stream) {
+        proctorState.stream.getTracks().forEach(track => track.stop());
+    }
+    
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(err => console.error(err));
+    }
+
+    const timer = document.getElementById('floating-timer');
+    if (timer) timer.remove();
+}
+
+async function requestCameraReaccess() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        proctorState.stream = stream;
+        showToast("Camera Signal Restored", "success");
+    } catch (err) {
+        showToast("Could not access camera. Please check permissions.", "danger");
+    }
+}
+
+async function submitProctoredExam(isAuto = false, autoReason = "") {
+    if (!isAuto && !confirm("Are you sure you want to finish the exam? Once submitted, you cannot return.")) return;
+
+    proctorState.isExamActive = false;
+    const items = document.querySelectorAll('.online-question-item');
+    const answers = [];
+    
+    items.forEach(item => {
+        const qId = item.dataset.id;
+        const qType = item.dataset.type;
+        let val = '';
+
+        if (qType === 'DESCRIPTIVE') {
+            const el = item.querySelector(`textarea[name="question_${qId}"]`);
+            val = el ? el.value.trim() : '';
+        } else {
+            const checked = item.querySelector(`input[name="question_${qId}"]:checked`);
+            val = checked ? checked.value : '';
+        }
+        answers.push({ questionId: qId, studentAnswer: val });
+    });
+
+    const submitBtn = document.getElementById('submit-exam-btn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finalizing...';
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/student/csv-submit-exam/${proctorState.timetableId}`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                answers,
+                isAutoSubmission: isAuto,
+                submissionReason: autoReason || "Manual Submission"
+            })
+        });
+
+        const result = await response.json();
+        cleanupProctoring();
+        
+        if (result.success) {
+            showToast(isAuto ? "Exam Auto-Submitted due to Security Policy" : "Exam successfully submitted!", isAuto ? "danger" : "success");
+            const modal = document.getElementById('exam-form-modal');
+            if (modal) modal.style.display = 'none';
+            loadAvailableExams();
+        } else {
+            showToast(result.message || "Submission error", "error");
+        }
+    } catch (error) {
+        console.error('Error submitting exam:', error);
+        cleanupProctoring();
+        showToast("Critical error during submission. Results may not have saved.", "danger");
+    }
+}
+
+async function submitOnlineExam(timetableId) {
+    if (!confirm("Are you sure you want to submit your online exam? You cannot make changes after submission.")) return;
+
+    const items = document.querySelectorAll('.online-question-item');
+    const answers = [];
+    
+    let allAnswered = true;
+    items.forEach(item => {
+        const qId = item.dataset.id;
+        const qType = item.dataset.type;
+        let val = '';
+
+        if (qType === 'DESCRIPTIVE') {
+            val = item.querySelector(`textarea[name="question_${qId}"]`).value.trim();
+        } else {
+            const checked = item.querySelector(`input[name="question_${qId}"]:checked`);
+            val = checked ? checked.value : '';
+        }
+
+        if (!val) allAnswered = false;
+        answers.push({ questionId: qId, studentAnswer: val });
+    });
+
+    if (!allAnswered) {
+        if (!confirm("You have not answered all questions. Are you sure you want to submit?")) return;
+    }
+
+    const submitBtn = document.getElementById('submit-exam-btn');
+    const originalContent = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/student/csv-submit-exam/${timetableId}`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ answers })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast("Success! Your exam has been submitted for evaluation.", "success");
+            const modal = document.getElementById('exam-form-modal');
+            if (modal) modal.style.display = 'none';
+            loadAvailableExams();
+        } else {
+            showToast(result.message || "Submission failed", "error");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+        }
+    } catch (error) {
+        console.error('Error submitting online exam:', error);
+        showToast("Connection error during submission", "error");
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalContent;
+    }
+}
+
+// ────────────────────────────────────────────────
+// Student Results Module
+// ────────────────────────────────────────────────
+
+async function loadMyResults() {
+    const loading = document.getElementById('student-results-loading');
+    const empty = document.getElementById('student-results-empty');
+    const container = document.getElementById('student-results-container');
+    
+    if (!container) return;
+
+    if (loading) loading.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/student/my-results', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (loading) loading.style.display = 'none';
+
+        if (result.success && result.data && result.data.length > 0) {
+            if (container) {
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.gap = '30px';
+
+                // Group by examName
+                const grouped = {};
+                result.data.forEach(res => {
+                    const exam = res.examName;
+                    if (!grouped[exam]) {
+                        grouped[exam] = {
+                            examName: exam,
+                            subjects: [],
+                            totalMarks: 0,
+                            totalMaxMarks: 0
+                        };
+                    }
+                    grouped[exam].subjects.push(res);
+                    grouped[exam].totalMarks += parseFloat(res.totalMarks || 0);
+                    grouped[exam].totalMaxMarks += parseFloat(res.totalMaxMarks || 0);
+                });
+
+                let html = '';
+                for (const exam in grouped) {
+                    const data = grouped[exam];
+                    const percentageValue = data.totalMaxMarks > 0 ? ((data.totalMarks / data.totalMaxMarks) * 100).toFixed(2) : 0;
+                    const status = percentageValue >= 35 ? 'PASS' : 'FAIL';
+                    const statusColor = status === 'PASS' ? '#10b981' : '#ef4444';
+
+                    html += `
+                        <div class="result-summary-card" style="background: white; border-radius: 24px; padding: 40px; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); font-family: 'Poppins', sans-serif; position: relative; overflow: hidden;">
+                            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 6px; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 1px solid #f1f5f9; padding-bottom: 30px;">
+                                <div>
+                                    <h3 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin: 0;">${data.examName}</h3>
+                                    <p style="color: #64748b; margin: 5px 0 0; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                                        <i class="fas fa-file-invoice" style="color: #2563eb;"></i> Performance Report Card
+                                    </p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="background: ${statusColor}15; color: ${statusColor}; padding: 10px 20px; border-radius: 12px; font-weight: 900; font-size: 1.2rem; letter-spacing: 1px; border: 1px solid ${statusColor}30;">${status}</div>
+                                    <p style="color: #94a3b8; font-size: 0.7rem; margin-top: 8px; font-weight: 800; text-transform: uppercase;">Final Status</p>
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; margin-bottom: 40px;">
+                                <div style="background: #f8fafc; border-radius: 20px; padding: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 18px;">
+                                    <div style="width: 54px; height: 54px; background: #eff6ff; color: #2563eb; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                    <div>
+                                        <p style="margin: 0; font-size: 0.75rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Aggregate Score</p>
+                                        <p style="margin: 2px 0 0; font-size: 1.5rem; font-weight: 900; color: #1e293b;">${percentageValue}<span style="font-size: 1rem; color: #94a3b8; margin-left: 2px;">%</span></p>
+                                    </div>
+                                </div>
+                                <div style="background: #f8fafc; border-radius: 20px; padding: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 18px;">
+                                    <div style="width: 54px; height: 54px; background: #f0fdf4; color: #16a34a; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.1);">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div>
+                                        <p style="margin: 0; font-size: 0.75rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Grand Total</p>
+                                        <p style="margin: 2px 0 0; font-size: 1.5rem; font-weight: 900; color: #1e293b;">${data.totalMarks} <span style="font-size: 0.9rem; color: #cbd5e1; font-weight: 700;">/ ${data.totalMaxMarks}</span></p>
+                                    </div>
+                                </div>
+                                <div style="background: #f8fafc; border-radius: 20px; padding: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 18px;">
+                                    <div style="width: 54px; height: 54px; background: #fffbeb; color: #d97706; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; box-shadow: 0 4px 6px -1px rgba(217, 119, 6, 0.1);">
+                                        <i class="fas fa-layer-group"></i>
+                                    </div>
+                                    <div>
+                                        <p style="margin: 0; font-size: 0.75rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Subjects Analyzed</p>
+                                        <p style="margin: 2px 0 0; font-size: 1.5rem; font-weight: 900; color: #1e293b;">${data.subjects.length}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="overflow-x: auto; background: #fcfdfe; border-radius: 20px; border: 1px solid #f1f5f9; padding: 10px;">
+                                <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
+                                    <thead>
+                                        <tr style="color: #64748b; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+                                            <th style="text-align: left; padding: 12px 20px;">Course Subject</th>
+                                            <th style="padding: 12px 20px; text-align: center;">Max</th>
+                                            <th style="padding: 12px 20px; text-align: center;">Marks</th>
+                                            <th style="padding: 12px 20px; text-align: center;">%</th>
+                                            <th style="padding: 12px 20px; text-align: right;">Evaluation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.subjects.map(s => {
+                                            const perfVal = parseFloat(s.percentage);
+                                            const grade = perfVal >= 90 ? 'A+' : perfVal >= 80 ? 'A' : perfVal >= 70 ? 'B+' : perfVal >= 60 ? 'B' : perfVal >= 50 ? 'C' : perfVal >= 35 ? 'D' : 'E';
+                                            const perfColor = perfVal >= 80 ? '#10b981' : perfVal >= 60 ? '#3b82f6' : perfVal >= 40 ? '#f59e0b' : '#ef4444';
+                                            
+                                            return `
+                                                <tr style="background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                                    <td style="padding: 18px 20px; border-radius: 12px 0 0 12px; font-weight: 700; color: #334155;">${s.subjectName}</td>
+                                                    <td style="padding: 18px 20px; text-align: center; color: #94a3b8; font-weight: 600;">${s.totalMaxMarks}</td>
+                                                    <td style="padding: 18px 20px; text-align: center; font-weight: 800; color: #0f172a;">${s.totalMarks}</td>
+                                                    <td style="padding: 18px 20px; text-align: center; font-weight: 800; color: #2563eb;">${s.percentage}%</td>
+                                                    <td style="padding: 18px 20px; border-radius: 0 12px 12px 0; text-align: right;">
+                                                        <span style="background: ${perfColor}15; color: ${perfColor}; padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 800;">Grade: ${grade}</span>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                }
+                container.innerHTML = html;
+                container.style.display = 'flex';
+            }
+        } else {
+            if (empty) empty.style.display = 'block';
+        }
+
+    } catch (err) {
+        console.error('Error fetching results:', err);
+        if (loading) loading.style.display = 'none';
+        if (empty) {
+            empty.style.display = 'block';
+            empty.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px;">
+                    <div style="width: 80px; height: 80px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 32px; color: #ef4444;"></i>
+                    </div>
+                    <h3 style="color: #1e293b; font-weight: 800;">Results Unavailable</h3>
+                    <p style="color: #64748b; font-size: 0.95rem;">Scheduled results have not been published yet or there was a system error.</p>
+                </div>
+            `;
+        }
     }
 }

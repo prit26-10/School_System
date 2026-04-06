@@ -1,95 +1,100 @@
-/* Exam Timetable - Formal Administrative Edition */
+/* Exam Timetable - Modern & Clean Edition */
 :root {
-    --exam-primary: #1e293b;
-    --exam-primary-light: #334155;
-    --exam-accent: #2563eb;
-    --exam-accent-light: #dbeafe;
-    --exam-success: #059669;
-    --exam-danger: #dc2626;
-    --exam-warning: #d97706;
-    --exam-bg: #f8fafc;
+    --exam-primary: #0f172a;
+    --exam-secondary: #64748b;
+    --exam-accent: #3b82f6;
+    --exam-accent-hover: #2563eb;
+    --exam-accent-soft: rgba(59, 130, 246, 0.1);
+    --exam-success: #10b981;
+    --exam-danger: #ef4444;
+    --exam-warning: #f59e0b;
+    --exam-bg: #f1f5f9;
     --exam-card-bg: #ffffff;
     --exam-border: #e2e8f0;
     --exam-text-main: #1e293b;
     --exam-text-muted: #64748b;
-    --exam-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-    --exam-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --exam-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --exam-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
 }
 
 .exam-timetable-container {
-    padding: 40px 20px;
-    max-width: 1400px;
+    padding: 24px;
+    max-width: 1200px;
     margin: 0 auto;
-    background: var(--exam-bg);
-    min-height: 100vh;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .setup-grid {
     display: grid;
-    grid-template-columns: 1fr 1.5fr;
-    gap: 30px;
-    margin-bottom: 40px;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
 }
 
-/* Formal Administrative Cards */
+/* Modern Card Styling */
 .selection-card {
     background: var(--exam-card-bg);
-    border-radius: 12px;
-    padding: 32px;
+    border-radius: var(--radius-lg);
+    padding: 28px;
     border: 1px solid var(--exam-border);
     box-shadow: var(--exam-shadow);
-    transition: box-shadow 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .selection-card:hover {
     box-shadow: var(--exam-shadow-lg);
+    transform: translateY(-2px);
 }
 
 .card-title {
     display: flex;
     align-items: center;
-    gap: 14px;
-    font-size: 1.2rem;
-    font-weight: 700;
+    gap: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
     color: var(--exam-primary);
-    margin-bottom: 28px;
-    padding-bottom: 15px;
-    border-bottom: 2px solid var(--exam-bg);
+    margin-bottom: 24px;
 }
 
 .card-title i {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--exam-primary);
-    color: white;
-    border-radius: 8px;
-    font-size: 1.1rem;
+    background: var(--exam-accent-soft);
+    color: var(--exam-accent);
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
 }
 
-/* Form Styling - Refined and Structured */
+/* Form Refinement */
 .form-group {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 10px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--exam-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--exam-secondary);
 }
 
 .form-control {
     width: 100%;
-    padding: 12px 16px;
-    background: #ffffff;
+    padding: 10px 14px;
+    background: #f8fafc;
     border: 1px solid var(--exam-border);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 0.95rem;
     color: var(--exam-text-main);
     transition: all 0.2s ease;
@@ -97,47 +102,54 @@
 }
 
 .form-control:focus {
+    background: #fff;
     border-color: var(--exam-accent);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 4px var(--exam-accent-soft);
 }
 
-.form-control::placeholder {
-    color: #94a3b8;
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 }
 
-/* Buttons - High Contrast and Formal */
+/* Button Styling */
 .btn-schedule {
     width: 100%;
-    padding: 14px;
+    padding: 12px;
     background: var(--exam-accent);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 0.95rem;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 8px;
 }
 
 .btn-schedule:hover {
-    background: #1d4ed8;
-    transform: translateY(-1px);
+    background: var(--exam-accent-hover);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .btn-schedule:active {
-    transform: translateY(0);
+    transform: scale(0.98);
 }
 
-/* Timetable Visualization Card */
+.btn-schedule.updating {
+    background: var(--exam-warning);
+}
+
+/* Timetable Table Styling */
 .timetable-view-card {
     background: var(--exam-card-bg);
-    border-radius: 12px;
-    padding: 35px;
+    border-radius: var(--radius-lg);
+    padding: 32px;
     box-shadow: var(--exam-shadow);
     border: 1px solid var(--exam-border);
 }
@@ -146,75 +158,55 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 35px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--exam-border);
+    margin-bottom: 24px;
 }
 
 .view-header h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-size: 1.25rem;
+    font-weight: 600;
     color: var(--exam-primary);
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
 }
 
-.view-header h3 i {
-    color: var(--exam-accent);
-}
-
-.current-selection-info {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--exam-accent);
-    background: var(--exam-accent-light);
-    padding: 8px 20px;
-    border-radius: 6px;
-    border: 1px solid rgba(37, 99, 235, 0.1);
-}
-
-/* Professional Data Table */
 .exam-table-wrapper {
     overflow-x: auto;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     border: 1px solid var(--exam-border);
 }
 
 .exam-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .exam-table th {
-    background: #f1f5f9;
+    background: #f8fafc;
     text-align: left;
-    padding: 15px 20px;
-    color: var(--exam-text-muted);
+    padding: 14px 20px;
+    color: var(--exam-secondary);
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--exam-border);
-}
-
-.exam-table tr {
-    border-bottom: 1px solid var(--exam-border);
-}
-
-.exam-table tr:last-child {
-    border-bottom: none;
+    border-bottom: 2px solid var(--exam-border);
 }
 
 .exam-table td {
-    padding: 18px 20px;
+    padding: 16px 20px;
     font-size: 0.95rem;
     color: var(--exam-text-main);
-    background: white;
+    border-bottom: 1px solid var(--exam-border);
+}
+
+.exam-table tr:last-child td {
+    border-bottom: none;
 }
 
 .exam-table tr:hover td {
-    background: #fafafa;
+    background: #f1f5f9;
 }
 
 .entry-date {
@@ -223,90 +215,72 @@
 }
 
 .entry-date span:first-child {
-    font-weight: 700;
+    font-weight: 600;
     color: var(--exam-primary);
 }
 
 .entry-date .day {
     font-size: 0.8rem;
-    color: var(--exam-text-muted);
-}
-
-.entry-time {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--exam-primary);
-    font-weight: 600;
-}
-
-.entry-time i {
-    color: var(--exam-accent);
+    color: var(--exam-secondary);
 }
 
 .duration-badge {
     background: #f1f5f9;
     color: var(--exam-text-main);
-    padding: 4px 12px;
-    border-radius: 50px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
     border: 1px solid var(--exam-border);
 }
 
-.btn-delete-entry {
-    background: #fef2f2;
-    color: var(--exam-danger);
-    border: 1px solid #fee2e2;
+/* Action Buttons in Table */
+.action-cell {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-table-action {
     width: 32px;
     height: 32px;
-    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.btn-edit-entry {
+    background: var(--exam-accent-soft);
+    color: var(--exam-accent);
+}
+
+.btn-edit-entry:hover {
+    background: var(--exam-accent);
+    color: white;
+}
+
+.btn-delete-entry {
+    background: #fee2e2;
+    color: var(--exam-danger);
 }
 
 .btn-delete-entry:hover {
     background: var(--exam-danger);
     color: white;
-    border-color: var(--exam-danger);
 }
 
-/* Animations */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.exam-timetable-container {
-    animation: fadeIn 0.4s ease-out;
-}
-
-/* Empty State Styling */
-.loading-cell, .empty-cell {
-    text-align: center;
-    padding: 50px 0;
-    color: var(--exam-text-muted);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 1024px) {
+/* Responsive */
+@media (max-width: 992px) {
     .setup-grid {
         grid-template-columns: 1fr;
     }
 }
 
-@media (max-width: 768px) {
-    .view-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 20px;
-    }
-    
-    .view-actions {
-        width: 100%;
-        justify-content: space-between;
+@media (max-width: 640px) {
+    .grid-2 {
+        grid-template-columns: 1fr;
     }
 }

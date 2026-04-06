@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Exam Environment - SmartSchool</title>
+    <link rel="stylesheet" href="/exam/exam.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="exam-body">
+
+    <!-- ══════════ SECURITY OVERLAYS ══════════ -->
+    <div id="security-overlay" class="security-overlay" style="display: none;">
+        <div class="overlay-content">
+            <i class="fas fa-exclamation-triangle fa-3x"></i>
+            <h2>Security Breach Detected</h2>
+            <p id="security-msg">Exiting full-screen or switching tabs is not allowed.</p>
+            <div class="auto-submit-countdown">Submitting in <span id="violation-countdown">5</span>s...</div>
+        </div>
+    </div>
+
+    <div id="camera-blur-overlay" class="camera-blur" style="display: none;">
+        <div class="blur-msg">
+            <i class="fas fa-video-slash"></i>
+            <h3>Camera Connection Lost</h3>
+            <p>Please ensure your camera is active to continue the exam.</p>
+        </div>
+    </div>
+
+    <!-- ══════════ PHASE 1: INSTRUCTIONS (Full-Width) ══════════ -->
+    <div id="phase-instructions" class="phase-instructions">
+
+        <!-- Top Dark Header Bar -->
+        <header class="top-bar">
+            <div class="top-bar-brand">
+                <div class="top-bar-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div class="top-bar-text">
+                    <span class="brand-name">Smart<span class="brand-accent">School</span></span>
+                    <span class="brand-sub">Examination System</span>
+                </div>
+            </div>
+            <div class="top-bar-status">
+                <span class="status-dot"></span>
+                <span>Secure Session Active</span>
+            </div>
+        </header>
+
+        <!-- Main Content: Two Columns -->
+        <main class="instructions-main">
+            <!-- LEFT COLUMN: Exam Info + Rules -->
+            <div class="instructions-left">
+                <div class="exam-title-block">
+                    <h1 id="header-subject-name">Subject Name</h1>
+                    <p id="header-exam-name" class="exam-subtitle">Online Examination</p>
+                </div>
+
+                <div class="rules-grid">
+                    <div class="rule-card">
+                        <div class="rule-icon"><i class="fas fa-expand"></i></div>
+                        <div class="rule-info">
+                            <h4>Full-Screen Mode</h4>
+                            <p>Mandatory full-screen environment. Exiting will auto-submit your exam.</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-icon"><i class="fas fa-eye"></i></div>
+                        <div class="rule-info">
+                            <h4>Tab Monitoring</h4>
+                            <p>Switching tabs or windows is considered malpractice and flagged instantly.</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-icon"><i class="fas fa-video"></i></div>
+                        <div class="rule-info">
+                            <h4>Live Proctoring</h4>
+                            <p>Camera must remain ON at all times. Your face must be clearly visible.</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-icon"><i class="fas fa-clock"></i></div>
+                        <div class="rule-info">
+                            <h4>Strict Timer</h4>
+                            <p>Auto-submits instantly when the allotted time expires. No extensions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Camera Preview -->
+            <div class="instructions-right">
+                <div class="camera-section">
+                    <div class="camera-label">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>Security Checkpoint</span>
+                    </div>
+                    <div class="camera-box">
+                        <div id="camera-loader" class="cam-loader">
+                            <i class="fas fa-circle-notch fa-spin fa-2x"></i>
+                            <span>Initializing Camera...</span>
+                        </div>
+                        <video id="pre-exam-video" autoplay playsinline muted></video>
+                        <div id="camera-denied" class="cam-denied" style="display: none;">
+                            <i class="fas fa-video-slash fa-2x"></i>
+                            <span>Camera Access Required</span>
+                        </div>
+                        <div class="cam-live-badge"><span class="live-dot"></span> LIVE</div>
+                    </div>
+                    <p class="cam-hint"><i class="fas fa-info-circle"></i> Center your face in the frame to proceed</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Footer -->
+        <footer class="instructions-footer">
+            <div class="exam-details-bar">
+                <div class="detail-chip">
+                    <i class="fas fa-hourglass-half"></i>
+                    <span>Duration: <strong id="exam-duration-text">--</strong> mins</span>
+                </div>
+                <div class="detail-divider"></div>
+                <div class="detail-chip">
+                    <i class="fas fa-lock"></i>
+                    <span>Environment: <strong>Secure</strong></span>
+                </div>
+                <div class="detail-divider"></div>
+                <div class="detail-chip">
+                    <i class="fas fa-shield-halved"></i>
+                    <span>Proctoring: <strong>Active</strong></span>
+                </div>
+            </div>
+            <button id="btn-start-test" class="btn-begin" disabled>
+                <span>BEGIN EVALUATION</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </footer>
+    </div>
+
+
+    <!-- ══════════ PHASE 2: EXAM ARENA ══════════ -->
+    <div id="phase-exam" class="phase-exam" style="display: none;">
+        <header class="exam-sticky-header">
+            <div class="header-left">
+                <span class="subject-tag" id="arena-subject">Subject</span>
+                <h2 id="arena-exam-title">Exam Title</h2>
+            </div>
+            <div class="header-right">
+                <div class="timer-display" id="exam-timer">
+                    <i class="fas fa-clock"></i>
+                    <span id="timer-countdown">00:00:00</span>
+                </div>
+                <button id="btn-finish-exam" class="btn-finish">
+                    <i class="fas fa-flag-checkered"></i> Finish Exam
+                </button>
+            </div>
+        </header>
+
+        <main class="exam-main">
+            <aside class="question-nav">
+                <h3>Questions</h3>
+                <div id="question-grid" class="question-grid"></div>
+                <div class="nav-legend">
+                    <div class="legend-item"><span class="dot answered"></span> Answered</div>
+                    <div class="legend-item"><span class="dot current"></span> Current</div>
+                    <div class="legend-item"><span class="dot pending"></span> Pending</div>
+                </div>
+            </aside>
+
+            <div class="question-arena">
+                <div id="current-question-container" class="question-card-container"></div>
+                <div class="arena-footer">
+                    <button id="btn-prev" class="btn-nav"><i class="fas fa-chevron-left"></i> Previous</button>
+                    <span id="question-progress">Question 1 of 10</span>
+                    <button id="btn-next" class="btn-nav">Next <i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/exam/exam.js"></script>
+</body>
+</html>

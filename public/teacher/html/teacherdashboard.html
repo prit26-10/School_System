@@ -15,6 +15,22 @@
     <link rel="stylesheet" href="/css/academic-calendar.css">
     <link rel="stylesheet" href="/reset-password/reset-password.css">
     <link rel="icon" href="data:,">
+    <style>
+        .minimal-view .sidebar, 
+        .minimal-view .top-navbar {
+            display: none !important;
+        }
+        .minimal-view .main-content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        .minimal-view .dashboard-content {
+            max-width: 100% !important;
+            padding: 0 !important;
+            background: #f8fafc;
+        }
+    </style>
 </head>
 
 <body>
@@ -517,6 +533,66 @@
             <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 12px;">
                 <button type="button" class="btn btn-secondary" onclick="closeManageQuestionsModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveExamQuestions()" style="background: #2563eb; color: white;">Save Questions</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Question Upload Modal -->
+    <div id="csv-upload-modal" class="modal" style="display: none; z-index: 1060;">
+        <div class="modal-content" style="max-width: 500px; width: 90%; border-radius: 12px; overflow: hidden; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Upload CSV Question Bank</h2>
+                <button class="modal-close" onclick="closeCSVUploadModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 24px; background: #fff;">
+                <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Upload a CSV file to create an online exam with auto-grading. <a href="#" onclick="downloadCSVTemplate()" style="color: #2563eb; font-weight: 600; text-decoration: underline;">Download Template</a></p>
+                <form id="csv-upload-form" onsubmit="handleCSVUpload(event)">
+                    <input type="hidden" id="csv-upload-timetable-id">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:600; color:#475569; font-size: 0.9rem;">Select CSV File</label>
+                        <div style="border: 2px dashed #e2e8f0; border-radius: 12px; padding: 30px; text-align: center; background: #f8fafc; cursor: pointer;" onclick="document.getElementById('csv-file').click()">
+                            <i class="fas fa-file-csv" style="font-size: 36px; color: #cbd5e1; margin-bottom: 15px; display: block;"></i>
+                            <input type="file" id="csv-file" accept=".csv" required style="display: none;" onchange="document.getElementById('csv-file-name').textContent = this.files[0].name">
+                            <span id="csv-file-name" style="font-size: 0.85rem; color: #475569; font-weight: 500;">Click to browse CSV file</span>
+                        </div>
+                    </div>
+                    <button type="submit" id="csv-upload-submit-btn" class="btn btn-primary" style="width: 100%; padding: 12px; background: #2563eb; color: white; font-weight: 700; border: none; border-radius: 8px;">
+                        Upload Questions
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Exam Submissions Modal -->
+    <div id="csv-submissions-modal" class="modal" style="display: none; z-index: 1055;">
+        <div class="modal-content" style="max-width: 900px; width: 95%; max-height: 85vh; border-radius: 12px; overflow: hidden; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Online Exam Submissions</h2>
+                <button class="modal-close" onclick="closeCSVSubmissionsModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0; overflow-y: auto; flex: 1; background: #fff;">
+                <div id="csv-submissions-list-container" style="padding: 20px;">
+                    <!-- Submissions table will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Answer Evaluation Modal (CSV System) -->
+    <div id="csv-evaluation-modal" class="modal" style="display: none; z-index: 1070;">
+        <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 90vh; border-radius: 12px; overflow: hidden; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Evaluate Online Submission</h2>
+                <button class="modal-close" onclick="closeCSVEvaluationModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #fff;">
+                <div id="student-submission-detail-container">
+                    <!-- Student answers and marks input will go here -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeCSVEvaluationModal()">Close</button>
             </div>
         </div>
     </div>

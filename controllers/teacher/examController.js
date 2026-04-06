@@ -1,7 +1,10 @@
+const mongoose = require("mongoose");
 const ExamTimetable = require("../../models/ExamTimetable");
 const Exam = require("../../models/Exam");
 const ClassSubject = require("../../models/ClassSubject");
 const User = require("../../models/User");
+const ExamEntry = require("../../models/ExamEntry");
+const csv = require("csv-parser");
 const moment = require("moment-timezone");
 const path = require("path");
 const fs = require("fs");
@@ -335,6 +338,346 @@ exports.evaluateExamAnswers = async (req, res) => {
     });
   } catch (error) {
     console.error("Error evaluating answers:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Upload questions via CSV for an exam timetable entry
+ */
+exports.uploadCSVQuestions = async (req, res) => {
+  try {
+    const { timetableId } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Please upload a CSV file" });
+    }
+
+    const timetable = await ExamTimetable.findById(timetableId);
+    if (!timetable) {
+      return res.status(404).json({ success: false, message: "Exam session not found" });
+    }
+
+    const results = [];
+    fs.createReadStream(req.file.path)
+      .pipe(csv())
+      .on("data", (data) => results.push(data))
+      .on("end", async () => {
+        try {
+          const questionsToInsert = results.map(row => {
+            // Normalize question type
+            const rawType = (row.type || row.questionType || '').trim().toUpperCase();
+            let questionType = 'DESCRIPTIVE';
+            if (rawType === 'MCQ') questionType = 'MCQ';
+            else if (rawType === 'TF' || rawType === 'TRUEFALSE' || rawType === 'TRUE/FALSE') questionType = 'TF';
+
+            // Build options array from separate columns (optionA, optionB, optionC, optionD)
+            let options = [];
+            if (questionType === 'MCQ') {
+              ['optionA', 'optionB', 'optionC', 'optionD'].forEach(key => {
+                if (row[key] && row[key].trim()) options.push(row[key].trim());
+              });
+              // Fallback: if no separate columns, try legacy 'options' field
+              if (options.length === 0 && row.options) {
+                options = row.options.split('|').map(o => o.trim()).filter(Boolean);
+              }
+            } else if (questionType === 'TF') {
+              options = ['True', 'False'];
+            }
+
+            return {
+              timetableId,
+              type: 'QUESTION',
+              questionType,
+              questionText: row.question || row.questionText || '',
+              options,
+              correctAnswer: (row.correctAnswer || '').trim(),
+              maxMarks: Number(row.maxMarks || row.marks) || 5
+            };
+          });
+
+          // Remove old questions for this timetableId and replace with new ones
+          await ExamEntry.deleteMany({ timetableId, type: 'QUESTION' });
+          await ExamEntry.insertMany(questionsToInsert);
+
+          // Update timetable status (using existing field or adding a flag)
+          timetable.paperUploadStatus = 'uploaded';
+          await timetable.save();
+
+          // Cleanup file
+          fs.unlinkSync(req.file.path);
+
+          res.status(200).json({
+            success: true,
+            message: `Successfully uploaded ${questionsToInsert.length} questions.`,
+          });
+        } catch (err) {
+          console.error("Error processing CSV data:", err);
+          res.status(500).json({ success: false, message: "Error processing CSV data" });
+        }
+      });
+  } catch (error) {
+    console.error("Error uploading CSV:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get student submissions using the refactored ExamEntry schema (Embedded SUBMISSION)
+ */
+exports.getCSVExamSubmissions = async (req, res) => {
+  try {
+    const { timetableId } = req.params;
+    
+    // Find all submission documents for this timetable
+    const submissions = await ExamEntry.find({ 
+      timetableId: new mongoose.Types.ObjectId(timetableId), 
+      type: 'SUBMISSION' 
+    }).populate('studentId', 'name userId');
+
+    const mappedSubmissions = submissions.map(sub => {
+      const totalQuestions = sub.questions.length;
+      const evaluatedQuestions = sub.questions.filter(q => q.status === 'EVALUATED').length;
+      
+      return {
+        studentId: sub.studentId._id,
+        name: sub.studentId.name,
+        userId: sub.studentId.userId,
+        submissionTime: sub.createdAt,
+        isFullyEvaluated: evaluatedQuestions === totalQuestions,
+        status: sub.overallStatus === "SUBMITTED_TO_ADMIN" ? "Submitted to Admin" : (evaluatedQuestions === totalQuestions ? "Evaluated" : "Pending"),
+        overallStatus: sub.overallStatus,
+        submissionId: sub._id
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: mappedSubmissions
+    });
+  } catch (error) {
+    console.error("Error fetching submissions:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get detailed student submission for evaluation
+ */
+exports.getStudentSubmissionDetail = async (req, res) => {
+  try {
+    const { timetableId, studentId } = req.params;
+
+    // Find the SUBMISSION document and populate student info
+    const submission = await ExamEntry.findOne({ 
+      timetableId, 
+      studentId, 
+      type: 'SUBMISSION' 
+    }).populate('studentId', 'name userId');
+
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission not found" });
+    }
+
+    // Fetch timetable for subject name, date, etc.
+    const timetable = await ExamTimetable.findById(timetableId).select('subjectName subjectCode date startTime class');
+
+    const studentInfo = submission.studentId;
+
+    // Build question list with student/exam metadata attached
+    const detailedSubmission = submission.questions.map(q => {
+      return {
+        questionId: q.questionId,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        maxMarks: q.maxMarks,
+        studentAnswer: q.studentAnswer,
+        marksObtained: q.marksObtained,
+        status: q.status,
+        feedback: q.feedback,
+        answerId: q._id,
+        submissionId: submission._id,
+        studentName: studentInfo ? studentInfo.name : 'Unknown',
+        studentUserId: studentInfo ? studentInfo.userId : '-',
+        subjectName: timetable ? timetable.subjectName : '-',
+        subjectCode: timetable ? timetable.subjectCode : '-',
+        examDate: timetable ? timetable.date : null,
+        examClass: timetable ? timetable.class : '-',
+        submittedAt: submission.createdAt
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: detailedSubmission
+    });
+  } catch (error) {
+    console.error("Error fetching submission detail:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Save marks for a descriptive question or update auto-marks within a SUBMISSION
+ */
+exports.saveManualMarking = async (req, res) => {
+  try {
+    const { answerId } = req.params; // This is the sub-document ID (q._id)
+    const { marksObtained, feedback } = req.body;
+
+    // Find the submission that contains this question ID in its questions array
+    const submission = await ExamEntry.findOne({ "questions._id": answerId });
+    
+    if (!submission) {
+      return res.status(404).json({ success: false, message: "Submission/Question not found" });
+    }
+
+    // Find the specific question and update it
+    const q = submission.questions.id(answerId);
+    if (!q) return res.status(404).json({ success: false, message: "Question not found" });
+
+    q.marksObtained = marksObtained;
+    q.feedback = feedback || "";
+    q.status = 'EVALUATED';
+
+    // Recalculate total marks obtained
+    submission.totalMarksObtained = submission.questions.reduce((total, qu) => total + (qu.marksObtained || 0), 0);
+    
+    // Check overall status
+    const allEvaluated = submission.questions.every(qu => qu.status === 'EVALUATED');
+    if (allEvaluated) {
+      submission.overallStatus = 'EVALUATED';
+    }
+
+    await submission.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Marks updated successfully",
+      data: q
+    });
+  } catch (error) {
+    console.error("Error saving manual marks:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Download sample CSV for exam questions
+ */
+exports.getCSVSampleFile = async (req, res) => {
+  try {
+    const questions = [
+      { question: "What is the capital of France?", type: "MCQ", optionA: "London", optionB: "Paris", optionC: "Berlin", optionD: "Madrid", correctAnswer: "B" },
+      { question: "Which planet is known as the Red Planet?", type: "MCQ", optionA: "Venus", optionB: "Jupiter", optionC: "Mars", optionD: "Saturn", correctAnswer: "C" },
+      { question: "What is the largest mammal?", type: "MCQ", optionA: "Elephant", optionB: "Blue Whale", optionC: "Giraffe", optionD: "Hippopotamus", correctAnswer: "B" },
+      { question: "What is 2 + 2?", type: "MCQ", optionA: "3", optionB: "4", optionC: "5", optionD: "6", correctAnswer: "B" },
+      { question: "Which element has the symbol 'O'?", type: "MCQ", optionA: "Gold", optionB: "Oxygen", optionC: "Silver", optionD: "Iron", correctAnswer: "B" },
+      { question: "The Earth is flat.", type: "TF", optionA: "True", optionB: "False", optionC: "", optionD: "", correctAnswer: "False" },
+      { question: "Water boils at 100°C at sea level.", type: "TF", optionA: "True", optionB: "False", optionC: "", optionD: "", correctAnswer: "True" },
+      { question: "Sharks are mammals.", type: "TF", optionA: "True", optionB: "False", optionC: "", optionD: "", correctAnswer: "False" },
+      { question: "The sun rises in the east.", type: "TF", optionA: "True", optionB: "False", optionC: "", optionD: "", correctAnswer: "True" },
+      { question: "Mount Everest is the tallest mountain.", type: "TF", optionA: "True", optionB: "False", optionC: "", optionD: "", correctAnswer: "True" },
+      { question: "Explain the process of photosynthesis.", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "Discuss the impact of the industrial revolution.", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "Describe the water cycle.", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "What are the benefits of exercise?", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "Explain the concept of supply and demand.", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "How does a blockchain work?", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "Discuss the importance of renewable energy.", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "What caused the Great Depression?", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "Describe the structure of an atom.", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" },
+      { question: "What is the theory of relativity?", type: "DESCRIPTIVE", optionA: "", optionB: "", optionC: "", optionD: "", correctAnswer: "" }
+    ];
+
+    let csvContent = "question,type,optionA,optionB,optionC,optionD,correctAnswer\n";
+    questions.forEach(q => {
+      const row = [
+        `"${q.question.replace(/"/g, '""')}"`,
+        q.type,
+        `"${q.optionA}"`,
+        `"${q.optionB}"`,
+        `"${q.optionC}"`,
+        `"${q.optionD}"`,
+        `"${q.correctAnswer}"`
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("exam_questions_sample.csv");
+    return res.send(csvContent);
+  } catch (error) {
+    console.error("Error generating sample CSV:", error);
+    res.status(500).json({ success: false, message: "Error generating sample CSV" });
+  }
+};
+
+/**
+ * Finalize a student submission — locks it as EVALUATED
+ * Sets all auto-graded questions to EVALUATED status if not already set,
+ * and marks the overall submission as EVALUATED
+ */
+exports.finalizeSubmission = async (req, res) => {
+  try {
+    const { timetableId, studentId } = req.params;
+
+    const submission = await ExamEntry.findOne({
+      timetableId,
+      studentId,
+      type: 'SUBMISSION'
+    });
+
+    if (!submission) {
+      return res.status(404).json({ success: false, message: 'Submission not found' });
+    }
+
+    // Mark any auto-graded questions that are still SUBMITTED as EVALUATED
+    let total = 0;
+    submission.questions.forEach(q => {
+      if ((q.questionType === 'MCQ' || q.questionType === 'TF') && q.status !== 'EVALUATED') {
+        q.status = 'EVALUATED';
+      }
+      total += (q.marksObtained || 0);
+    });
+
+    submission.overallStatus = 'EVALUATED';
+    submission.totalMarksObtained = total;
+    await submission.save();
+
+    res.status(200).json({ success: true, message: 'Submission finalized successfully' });
+  } catch (error) {
+    console.error('Error finalizing submission:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+/**
+ * Submit all evaluated submissions to Admin for a timetable
+ */
+exports.submitCSVExamsToAdmin = async (req, res) => {
+  try {
+    const { timetableId } = req.params;
+
+    // Update all submissions that are currently 'EVALUATED' to 'SUBMITTED_TO_ADMIN'
+    const result = await ExamEntry.updateMany(
+      { 
+        timetableId, 
+        type: 'SUBMISSION',
+        overallStatus: 'EVALUATED'
+      },
+      {
+        $set: { overallStatus: 'SUBMITTED_TO_ADMIN' }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully sent ${result.modifiedCount} evaluations to Admin.`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error("Error submitting to admin:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -131,6 +131,7 @@ const AppState = {
     allSubjects: [],
     allClassesWithTeachers: [],
     currentTimetableData: [],
+    currentTimetableEditingId: null,
     isLoading: false
 };
 
@@ -457,15 +458,16 @@ function loadPage(page, titleOverride = null) {
             render: renderExamTimetable,
             init: initializeExamTimetable
         },
-        'exam-notification': {
-            title: 'Send Exam Notification',
-            subtitle: 'Notify about exams',
-            render: renderExamNotification
-        },
         'publish-results': {
             title: 'Publish Results',
             subtitle: 'Publish examination results',
             render: renderPublishResults
+        },
+        'result-management': {
+            title: 'Result Management',
+            subtitle: 'Final scorecards and class-wise performance reports',
+            render: renderResultManagement,
+            init: initializeResultManagement
         },
         'profile': {
             title: 'Profile',
@@ -3399,9 +3401,11 @@ function renderTimetable() {
 async function checkExistingTimetableStatus() {
     const classId = document.getElementById('tt-class-select').value;
     const msgEl = document.getElementById('timetable-status-msg');
+    const container = document.getElementById('timetable-result-container');
 
     if (!classId) {
         msgEl.style.display = 'none';
+        if (container) container.innerHTML = '';
         return;
     }
 
@@ -3416,8 +3420,11 @@ async function checkExistingTimetableStatus() {
             msgEl.innerHTML = '<i class="fas fa-info-circle"></i> Timetable already exists for this class.';
             msgEl.style.color = '#f59e0b';
             msgEl.style.display = 'block';
+            // Automatically show the existing timetable
+            renderTimetablePreview(result.data);
         } else {
             msgEl.style.display = 'none';
+            if (container) container.innerHTML = ''; // Clear previous if no table exists
         }
     } catch (error) {
         console.error('Error checking timetable status:', error);
@@ -4261,27 +4268,6 @@ function renderExamTimetable() {
                     </select>
                 </div>
                 <button type="button" class="btn btn-primary"><i class="fas fa-plus"></i> Add Exam Schedule</button>
-            </form>
-        </div >
-        `;
-}
-
-function renderExamNotification() {
-    return `
-        <div class="content-card" >
-            <form class="form-horizontal">
-                <div class="form-group">
-                    <label>Select Exam</label>
-                    <select>
-                        <option>Half Yearly Exam</option>
-                        <option>Final Exam</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Message</label>
-                    <textarea rows="4" placeholder="Enter notification message"></textarea>
-                </div>
-                <button type="button" class="btn btn-primary"><i class="fas fa-bell"></i> Send Notification</button>
             </form>
         </div >
         `;
@@ -6274,24 +6260,31 @@ function renderExamTimetable() {
                 <!-- Selection Card -->
                 <div class="selection-card">
                     <div class="card-title">
-                        <i class="fas fa-cog"></i> Configure Schedule
+                        <i class="fas fa-cog"></i> 
+                        <span>Configure Schedule</span>
                     </div>
                     <div class="form-group">
                         <label for="exam-title-input">Exam Title</label>
-                        <input type="text" id="exam-title-input" class="form-control" placeholder="Enter Exam Title" required onkeyup="refreshTimetableGrid()">
+                        <input type="text" id="exam-title-input" class="form-control" placeholder="e.g. Mid-Term 2026" required onkeyup="refreshTimetableGrid()">
                     </div>
                     <div class="form-group">
-                        <label for="exam-class-select">Class</label>
+                        <label for="exam-class-select">Target Class</label>
                         <select id="exam-class-select" class="form-control" onchange="handleClassChange()">
                             <option value="">Select Class</option>
                         </select>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <button type="button" class="btn btn-secondary" style="width: 100%; padding: 10px; border-radius: 8px; font-weight: 500;" onclick="showAllExamTimetablesModal()">
+                            <i class="fas fa-list"></i> View All Existing Timetables
+                        </button>
                     </div>
                 </div>
 
                 <!-- Scheduling Form -->
                 <div class="selection-card">
                     <div class="card-title">
-                        <i class="fas fa-calendar-plus"></i> Add Entry
+                        <i class="fas fa-calendar-plus"></i> 
+                        <span id="form-action-title">Add Entry</span>
                     </div>
                     <form id="exam-schedule-form" onsubmit="addExamTimetableEntry(event)">
                         <div class="form-group">
@@ -6300,29 +6293,34 @@ function renderExamTimetable() {
                                 <option value="">Select Subject</option>
                             </select>
                         </div>
-                        <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="grid-2">
                             <div class="form-group">
-                                <label for="exam-date">Date</label>
+                                <label for="exam-date">Exam Date</label>
                                 <input type="date" id="exam-date" class="form-control" min="${getLocalDateString(new Date())}" required>
                             </div>
                             <div class="form-group">
-                                <label for="exam-duration">Duration (Mins)</label>
-                                <input type="number" id="exam-duration" class="form-control" placeholder="e.g. 180" required>
+                                <label for="exam-duration">Duration (Minutes)</label>
+                                <input type="number" id="exam-duration" class="form-control" placeholder="e.g. 180" required onchange="calculateTimes('duration')">
                             </div>
                         </div>
-                        <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="grid-2">
                             <div class="form-group">
                                 <label for="exam-start-time">Start Time</label>
-                                <input type="time" id="exam-start-time" class="form-control" required>
+                                <input type="time" id="exam-start-time" class="form-control" required onchange="calculateTimes('start')">
                             </div>
                             <div class="form-group">
                                 <label for="exam-end-time">End Time</label>
-                                <input type="time" id="exam-end-time" class="form-control" required>
+                                <input type="time" id="exam-end-time" class="form-control" required onchange="calculateTimes('end')">
                             </div>
                         </div>
-                        <button type="submit" class="btn-schedule">
-                            <i class="fas fa-plus"></i> Add to Timetable
-                        </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn-schedule" id="btn-submit-timetable">
+                                <i class="fas fa-plus"></i> <span id="btn-text">Add to Timetable</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btn-reset-timetable" onclick="resetTimetableForm()" style="display: none; padding: 12px; border-radius: 8px;">
+                                <i class="fas fa-times"></i> Cancel Edit
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -6331,9 +6329,8 @@ function renderExamTimetable() {
             <div class="timetable-view-card">
                 <div class="view-header">
                     <h3><i class="fas fa-table"></i> Class Timetable</h3>
-                    <div class="view-actions" style="display: flex; gap: 10px; align-items: center;">
-                        <div id="selection-status" class="current-selection-info">Please select exam and class</div>
-                        <button class="btn btn-primary" onclick="exportTimetablePDF()" style="padding: 8px 15px; font-size: 0.8rem;">
+                    <div class="view-actions">
+                        <button class="btn btn-primary" onclick="exportTimetablePDF()" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-file-pdf"></i> Export PDF
                         </button>
                     </div>
@@ -6343,16 +6340,17 @@ function renderExamTimetable() {
                         <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>Subject</th>
-                                <th>Time</th>
+                                <th>Subject/Code</th>
+                                <th>Time Slot</th>
                                 <th>Duration</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="exam-timetable-body">
                             <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">
-                                    No data to display. Select exam and class above.
+                                <td colspan="5" style="text-align: center; padding: 60px; color: var(--exam-secondary);">
+                                    <i class="fas fa-layer-group" style="font-size: 2.5rem; display: block; margin-bottom: 16px; opacity: 0.5;"></i>
+                                    Select exam and class above to see the schedule.
                                 </td>
                             </tr>
                         </tbody>
@@ -6427,15 +6425,11 @@ async function refreshTimetableGrid() {
     const examId = examTitleInput ? examTitleInput.value : '';
     const classId = document.getElementById('exam-class-select').value;
     const tbody = document.getElementById('exam-timetable-body');
-    const statusInfo = document.getElementById('selection-status');
     
     if (!examId || !classId) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">No data to display. Select exam and class above.</td></tr>';
-        statusInfo.textContent = 'Please select exam and class';
         return;
     }
-    
-    statusInfo.textContent = `Viewing schedule for Class ${classId}`;
     
     try {
         const token = localStorage.getItem('token');
@@ -6445,6 +6439,7 @@ async function refreshTimetableGrid() {
         const result = await response.json();
         
         if (result.success && result.data.length > 0) {
+            AppState.currentTimetableData = result.data; // Store for editing
             tbody.innerHTML = result.data.map(entry => `
                 <tr>
                     <td>
@@ -6455,25 +6450,50 @@ async function refreshTimetableGrid() {
                     </td>
                     <td>
                         <strong>${entry.subjectName}</strong>
-                        <div class="code" style="font-size: 0.8rem; color: #95a5a6;">${entry.subjectCode}</div>
+                        <div style="font-size: 0.8rem; color: var(--exam-secondary);">${entry.subjectCode}</div>
                     </td>
                     <td>
-                        <div class="entry-time">
-                            <i class="far fa-clock"></i> ${entry.startTime} - ${entry.endTime}
+                        <div style="font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                            <i class="far fa-clock" style="color: var(--exam-accent);"></i> ${entry.startTime} - ${entry.endTime}
                         </div>
                     </td>
                     <td>
                         <span class="duration-badge">${entry.duration} Mins</span>
                     </td>
                     <td>
-                        <button class="btn-delete-entry" onclick="deleteExamTimetableEntry('${entry._id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <div class="action-cell">
+                            <button class="btn-table-action btn-edit-entry" onclick="editExamTimetableEntry('${entry._id}')" title="Edit Entry">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-table-action btn-delete-entry" onclick="deleteExamTimetableEntry('${entry._id}')" title="Delete Entry">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `).join('');
+
+            // Disable subjects that are already added
+            const subjectSelect = document.getElementById('exam-subject-select');
+            if (subjectSelect) {
+                const existingCodes = result.data.map(e => e.subjectCode);
+                Array.from(subjectSelect.options).forEach(opt => {
+                    if (opt.value && existingCodes.includes(opt.value)) {
+                        opt.disabled = true;
+                    } else {
+                        opt.disabled = false;
+                    }
+                });
+            }
+
         } else {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray);">No exams scheduled for this selection.</td></tr>';
+            
+            // Enable all subjects
+            const subjectSelect = document.getElementById('exam-subject-select');
+            if (subjectSelect) {
+                Array.from(subjectSelect.options).forEach(opt => opt.disabled = false);
+            }
         }
     } catch (error) {
         console.error('Error fetching timetable:', error);
@@ -6494,6 +6514,7 @@ async function addExamTimetableEntry(event) {
     }
     
     const subjectSelect = document.getElementById('exam-subject-select');
+    const editingId = AppState.currentTimetableEditingId;
     
     const formData = {
         examTitle,
@@ -6508,8 +6529,11 @@ async function addExamTimetableEntry(event) {
     
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/exams/admin/timetable', {
-            method: 'POST',
+        const url = editingId ? `/api/exams/admin/timetable/${editingId}` : '/api/exams/admin/timetable';
+        const method = editingId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
             headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}` 
@@ -6520,15 +6544,115 @@ async function addExamTimetableEntry(event) {
         const result = await response.json();
         
         if (result.success) {
-            showToast('Entry added successfully', 'success');
-            document.getElementById('exam-schedule-form').reset();
+            showToast(editingId ? 'Entry updated successfully' : 'Entry added successfully', 'success');
+            resetTimetableForm();
             refreshTimetableGrid();
         } else {
-            showToast(result.message || 'Failed to add entry', 'error');
+            showToast(result.message || 'Failed to process request', 'error');
         }
     } catch (error) {
-        console.error('Error adding entry:', error);
+        console.error('Error processing timetable entry:', error);
         showToast('Internal Server Error', 'error');
+    }
+}
+
+function editExamTimetableEntry(id) {
+    const entry = AppState.currentTimetableData.find(e => e._id === id);
+    if (!entry) return;
+
+    AppState.currentTimetableEditingId = id;
+
+    // Fill form
+    const subjectSelect = document.getElementById('exam-subject-select');
+    if (subjectSelect) {
+        // Find option by value
+        for (let i = 0; i < subjectSelect.options.length; i++) {
+            if (subjectSelect.options[i].value === entry.subjectCode) {
+                subjectSelect.selectedIndex = i;
+                break;
+            }
+        }
+    }
+
+    document.getElementById('exam-date').value = getUTCDateString(entry.date);
+    document.getElementById('exam-duration').value = entry.duration;
+    document.getElementById('exam-start-time').value = entry.startTime;
+    document.getElementById('exam-end-time').value = entry.endTime;
+
+    // Update UI for Edit Mode
+    const btnSubmit = document.getElementById('btn-submit-timetable');
+    const btnReset = document.getElementById('btn-reset-timetable');
+    const actionTitle = document.getElementById('form-action-title');
+    const btnText = document.getElementById('btn-text');
+
+    if (btnSubmit) {
+        btnSubmit.classList.add('updating');
+        if (btnText) btnText.textContent = 'Update Entry';
+        const icon = btnSubmit.querySelector('i');
+        if (icon) icon.className = 'fas fa-save';
+    }
+    
+    if (btnReset) btnReset.style.display = 'block';
+    if (actionTitle) actionTitle.textContent = 'Edit Entry';
+
+    // Scroll to form
+    document.getElementById('exam-schedule-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetTimetableForm() {
+    AppState.currentTimetableEditingId = null;
+    const form = document.getElementById('exam-schedule-form');
+    if (form) form.reset();
+
+    // Reset UI
+    const btnSubmit = document.getElementById('btn-submit-timetable');
+    const btnReset = document.getElementById('btn-reset-timetable');
+    const actionTitle = document.getElementById('form-action-title');
+    const btnText = document.getElementById('btn-text');
+
+    if (btnSubmit) {
+        btnSubmit.classList.remove('updating');
+        if (btnText) btnText.textContent = 'Add to Timetable';
+        const icon = btnSubmit.querySelector('i');
+        if (icon) icon.className = 'fas fa-plus';
+    }
+    
+    if (btnReset) btnReset.style.display = 'none';
+    if (actionTitle) actionTitle.textContent = 'Add Entry';
+}
+
+function calculateTimes(changeType) {
+    const startInput = document.getElementById('exam-start-time');
+    const endInput = document.getElementById('exam-end-time');
+    const durationInput = document.getElementById('exam-duration');
+
+    if (!startInput || !endInput || !durationInput) return;
+
+    if (changeType === 'start' || changeType === 'duration') {
+        if (startInput.value && durationInput.value) {
+            const [hours, minutes] = startInput.value.split(':').map(Number);
+            const duration = parseInt(durationInput.value);
+            
+            const date = new Date();
+            date.setHours(hours, minutes, 0);
+            date.setMinutes(date.getMinutes() + duration);
+            
+            const endHours = String(date.getHours()).padStart(2, '0');
+            const endMinutes = String(date.getMinutes()).padStart(2, '0');
+            endInput.value = `${endHours}:${endMinutes}`;
+        }
+    } else if (changeType === 'end') {
+        if (startInput.value && endInput.value) {
+            const [sh, sm] = startInput.value.split(':').map(Number);
+            const [eh, em] = endInput.value.split(':').map(Number);
+            
+            let startTotal = sh * 60 + sm;
+            let endTotal = eh * 60 + em;
+            
+            if (endTotal < startTotal) endTotal += 24 * 60; // Next day
+            
+            durationInput.value = endTotal - startTotal;
+        }
     }
 }
 
@@ -6556,24 +6680,113 @@ async function deleteExamTimetableEntry(id) {
 }
 
 function exportTimetablePDF() {
-    const element = document.querySelector('.timetable-view-card');
-    const examName = document.getElementById('exam-period-select').options[document.getElementById('exam-period-select').selectedIndex].text;
-    const className = document.getElementById('exam-class-select').options[document.getElementById('exam-class-select').selectedIndex].text;
+    const examTitleInput = document.getElementById('exam-title-input');
+    const classSelect = document.getElementById('exam-class-select');
     
-    if (!examName || !className) {
-        showToast('Please select Exam and Class to export', 'warning');
+    if (!examTitleInput || !classSelect || !examTitleInput.value || !classSelect.value) {
+        showToast('Please enter Exam Title and select Class to export', 'warning');
         return;
     }
 
+    const examName = examTitleInput.value;
+    const className = classSelect.options[classSelect.selectedIndex].text;
+    
+    if (!AppState.currentTimetableData || AppState.currentTimetableData.length === 0) {
+        showToast('No timetable data available to export', 'warning');
+        return;
+    }
+
+    // Build table rows from raw data to bypass any DOM rendering issues
+    const rowsHtml = AppState.currentTimetableData.map(entry => {
+        const dateStr = formatDate(entry.date);
+        const dayStr = moment(entry.date).format('dddd');
+        return `
+            <tr>
+                <td style="padding: 12px 15px; border: 1px solid #cbd5e1; font-size: 13px; color: #1e293b; background-color: #ffffff;">
+                    <div style="font-weight: 600; margin-bottom: 2px;">${dateStr}</div>
+                    <div style="color: #64748b; font-size: 11px;">${dayStr}</div>
+                </td>
+                <td style="padding: 12px 15px; border: 1px solid #cbd5e1; font-size: 13px; color: #1e293b; background-color: #ffffff;">
+                    <div style="font-weight: 600; margin-bottom: 2px;">${entry.subjectName || '-'}</div>
+                    <div style="color: #64748b; font-size: 11px;">${entry.subjectCode || '-'}</div>
+                </td>
+                <td style="padding: 12px 15px; border: 1px solid #cbd5e1; font-size: 13px; color: #1e293b; background-color: #ffffff;">
+                    ${entry.startTime || '-'} - ${entry.endTime || '-'}
+                </td>
+                <td style="padding: 12px 15px; border: 1px solid #cbd5e1; font-size: 13px; color: #1e293b; background-color: #ffffff;">
+                    ${entry.duration || '-'} Mins
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const htmlContent = `
+        <div style="font-family: 'Poppins', sans-serif; padding: 30px; background: #ffffff; width: 1040px; box-sizing: border-box;">
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                <h1 style="color: #1e293b; margin: 0; font-size: 26px; font-weight: 700; text-transform: uppercase;">Smart School</h1>
+                <h2 style="color: #334155; margin: 6px 0; font-size: 18px; font-weight: 600;">EXAMINATION TIMETABLE</h2>
+                <div style="display: flex; justify-content: center; gap: 40px; color: #475569; font-size: 14px; margin-top: 5px;">
+                    <span><strong>Exam:</strong> ${examName}</span>
+                    <span><strong>Class:</strong> ${className}</span>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 40px;">
+                <thead>
+                    <tr>
+                        <th style="padding: 12px 15px; border: 1px solid #cbd5e1; background-color: #f8fafc; color: #0f172a; font-weight: 600; text-transform: uppercase; font-size: 12px; text-align: left;">Date</th>
+                        <th style="padding: 12px 15px; border: 1px solid #cbd5e1; background-color: #f8fafc; color: #0f172a; font-weight: 600; text-transform: uppercase; font-size: 12px; text-align: left;">Subject/Code</th>
+                        <th style="padding: 12px 15px; border: 1px solid #cbd5e1; background-color: #f8fafc; color: #0f172a; font-weight: 600; text-transform: uppercase; font-size: 12px; text-align: left;">Time Slot</th>
+                        <th style="padding: 12px 15px; border: 1px solid #cbd5e1; background-color: #f8fafc; color: #0f172a; font-weight: 600; text-transform: uppercase; font-size: 12px; text-align: left;">Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <!-- Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px;">
+                <div style="font-size: 11px; color: #64748b;">
+                    Generated on ${moment().format('MMMM Do YYYY, h:mm A')}
+                </div>
+                <div style="text-align: center;">
+                    <div style="border-top: 1.5px solid #1e293b; width: 200px; padding-top: 6px; font-weight: 600; color: #1e293b; font-size: 13px;">
+                        Controller of Examinations
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Create a temporary container exclusively for html2pdf
+    const printContainer = document.createElement('div');
+    printContainer.innerHTML = htmlContent;
+
     const opt = {
         margin: 10,
-        filename: `Exam_Timetable_${className}_${examName}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
+        filename: `Timetable_${className.replace(/\s+/g, '_')}_${examName.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            windowWidth: 1040
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
     };
 
-    html2pdf().set(opt).from(element).save();
+    // Trigger PDF generation on the clean layout
+    try {
+        html2pdf().set(opt).from(printContainer).save().then(() => {
+            showToast('Timetable PDF downloaded successfully', 'success');
+        });
+    } catch (err) {
+        console.error('PDF Export Error:', err);
+        showToast('Failed to generate PDF. Please try again.', 'error');
+    }
 }
 
 // ============================================
@@ -6582,46 +6795,49 @@ function exportTimetablePDF() {
 
 function renderPublishResults() {
     return `
-        <div class="dashboard-header" style="margin-bottom: 24px;">
-            <h2>Publish Results</h2>
-            <p style="color: var(--gray);">Review evaluated exams and publish results to students.</p>
-        </div>
-        
-        <div class="content-card">
-            <div class="applications-header" style="margin-bottom: 20px;">
-                <h3 style="font-size: 1.1rem; color: var(--dark-blue);"><i class="fas fa-check-double"></i> Pending Approvals</h3>
-                <button class="btn-refresh" onclick="fetchEvaluatedExams()" style="background: none; border: none; color: var(--primary-blue); cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 500;">
+        <div class="eval-admin-page" style="background: #f8fafc; min-height: calc(100vh - 80px); padding: 30px; font-family: 'Poppins', sans-serif;">
+            <div class="eval-admin-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <h2 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin: 0;">Publish Results</h2>
+                    <p style="color: #64748b; margin: 5px 0 0; font-size: 0.95rem;">Approve and release evaluated examination marks to student dashboards.</p>
+                </div>
+                <button class="btn-refresh" onclick="fetchEvaluatedExams()" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 10px 18px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s;">
                     <i class="fas fa-sync-alt"></i> Refresh List
                 </button>
             </div>
             
-            <div id="publish-results-loading" style="display: none; padding: 40px; text-align: center;">
-                <div class="loading-spinner" style="margin: 0 auto;"></div>
-                <p style="margin-top: 15px; color: var(--gray);">Fetching evaluated exams...</p>
+            <div id="publish-results-loading" style="display: none; padding: 80px 20px; text-align: center; background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #2563eb; margin-bottom: 16px;"></i>
+                <p style="color: #64748b; font-weight: 500;">Scanning for new evaluations...</p>
             </div>
             
-            <div id="publish-results-empty" style="display: none; padding: 60px 20px; text-align: center;">
-                <i class="fas fa-clipboard-check" style="font-size: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
-                <h3 style="color: var(--dark-blue); margin-bottom: 8px;">No Exams to Publish</h3>
-                <p style="color: var(--gray);">All evaluated exams have been published or no evaluations are pending.</p>
+            <div id="publish-results-empty" style="display: none; padding: 80px 20px; text-align: center; background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 2px dashed #e2e8f0;">
+                <div style="width: 80px; height: 80px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <i class="fas fa-clipboard-check" style="font-size: 32px; color: #94a3b8;"></i>
+                </div>
+                <h3 style="color: #1e293b; margin-bottom: 8px; font-weight: 700;">No Pending Approvals</h3>
+                <p style="color: #64748b; max-width: 400px; margin: 0 auto; font-size: 0.9rem; line-height: 1.5;">All evaluated exams have been published or teachers haven't submitted new ones yet.</p>
             </div>
-
-            <div class="table-wrapper">
-                <table id="publish-results-table" class="data-table">
-                    <thead>
-                        <tr>
-                            <th>EXAM</th>
-                            <th>CLASS</th>
-                            <th>SUBJECT</th>
-                            <th>DATE</th>
-                            <th>EVALUATED</th>
-                            <th>ACTION</th>
-                        </tr>
-                    </thead>
-                    <tbody id="publish-results-tbody">
-                        <!-- Populated dynamically -->
-                    </tbody>
-                </table>
+            <div id="publish-results-table-container" class="table-card" style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; display: none;">
+                <div style="padding: 20px 24px; border-bottom: 1px solid #f1f5f9; background: #fff; display: flex; align-items: center; gap: 12px;">
+                    <i class="fas fa-tasks" style="color: #2563eb;"></i>
+                    <span style="font-weight: 700; color: #1e293b; font-size: 1rem;">Queue for Final Approval</span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
+                        <thead>
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #f1f5f9;">
+                                <th style="text-align: left; padding: 16px 24px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Examination Info</th>
+                                <th style="text-align: left; padding: 16px 24px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Class & Subject</th>
+                                <th style="text-align: left; padding: 16px 24px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Evaluated Count</th>
+                                <th style="text-align: right; padding: 16px 24px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="publish-results-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
@@ -6630,14 +6846,14 @@ function renderPublishResults() {
 async function fetchEvaluatedExams() {
     const loading = document.getElementById('publish-results-loading');
     const empty = document.getElementById('publish-results-empty');
-    const table = document.getElementById('publish-results-table');
+    const container = document.getElementById('publish-results-table-container');
     const tbody = document.getElementById('publish-results-tbody');
     
     if(!tbody) return;
 
-    loading.style.display = 'block';
-    empty.style.display = 'none';
-    table.style.display = 'none';
+    if (loading) loading.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    if (container) container.style.display = 'none';
 
     try {
         const token = localStorage.getItem('token');
@@ -6646,25 +6862,41 @@ async function fetchEvaluatedExams() {
         });
         const result = await response.json();
 
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
 
         if (result.success && result.data.length > 0) {
-            table.style.display = 'table';
+            if (container) container.style.display = 'block';
             tbody.innerHTML = result.data.map(exam => {
-                const isAllPublished = exam.submissions.every(s => s.status === 'published');
+                const dateStr = formatDate(exam.date);
+                const isAllPublished = exam.submissions && exam.submissions.length > 0 && exam.submissions.every(s => s.status === 'published');
                 
                 return `
-                    <tr>
-                        <td style="font-weight: 500;">${exam.examName}</td>
-                        <td>Class ${exam.className}</td>
-                        <td>${exam.subjectName}</td>
-                        <td style="color: var(--gray);">${formatDate(exam.date)}</td>
-                        <td><span style="background: #eff6ff; color: #0A66FF; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${exam.evaluatedCount} Students</span></td>
-                        <td>
+                    <tr style="border-bottom: 1px solid #f8fafc; transition: all 0.2s;" onmouseover="this.style.background='#fcfdfe'" onmouseout="this.style.background=''">
+                        <td style="padding: 20px 24px;">
+                            <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px; font-size: 0.95rem;">${exam.examName}</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 5px;">
+                                <i class="far fa-calendar-alt"></i> ${dateStr}
+                            </div>
+                        </td>
+                        <td style="padding: 20px 24px;">
+                            <div style="font-weight: 600; color: #334155; margin-bottom: 4px; font-size: 0.9rem;">${exam.subjectName}</div>
+                            <div style="display: inline-flex; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">Class ${exam.className}</div>
+                        </td>
+                        <td style="padding: 20px 24px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="display: flex;">
+                                    <div style="width: 28px; height: 28px; border-radius: 50%; background: #e0e7ff; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #4338ca; font-weight: 700;">${exam.evaluatedCount}</div>
+                                </div>
+                                <span style="font-size: 0.85rem; font-weight: 600; color: #0369a1;">${exam.evaluatedCount} Student(s)</span>
+                            </div>
+                        </td>
+                        <td style="padding: 20px 24px; text-align: right;">
                             ${isAllPublished ? 
-                                `<span style="color: #10b981; font-weight: 600; font-size: 0.9rem;"><i class="fas fa-check-circle"></i> Published</span>` :
-                                `<button onclick="publishResults('${exam.timetableId}')" style="background: var(--primary-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
-                                    <i class="fas fa-bullhorn"></i> Publish Marks
+                                `<span style="color: #10b981; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-check-circle"></i> Published
+                                 </span>` :
+                                `<button onclick="publishResults('${exam.timetableId}')" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);" onmouseover="this.style.background='#1d4ed8'; this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#2563eb'; this.style.transform='none'">
+                                    <i class="fas fa-bullhorn" style="font-size: 0.7rem;"></i> Publish Marks
                                 </button>`
                             }
                         </td>
@@ -6672,13 +6904,15 @@ async function fetchEvaluatedExams() {
                 `;
             }).join('');
         } else {
-            empty.style.display = 'block';
+            if (empty) empty.style.display = 'block';
         }
     } catch (error) {
         console.error('Error fetching evaluated exams:', error);
-        loading.style.display = 'none';
-        empty.style.display = 'block';
-        empty.innerHTML = '<h3>Error Loading Data</h3><p>Could not retrieve evaluated exams.</p>';
+        if (loading) loading.style.display = 'none';
+        if (empty) {
+            empty.style.display = 'block';
+            empty.innerHTML = `<h3 style="color: #ef4444;">Error Loading Data</h3><p style="color: #64748b;">Could not retrieve evaluated exams from the server.</p>`;
+        }
     }
 }
 
@@ -6713,3 +6947,420 @@ loadPage = function(page, titleOverride = null) {
         fetchEvaluatedExams();
     }
 };
+
+// ============================================
+// EXAM TIMETABLES VIEW ALL MODAL
+// ============================================
+
+function showAllExamTimetablesModal() {
+    let existingModal = document.getElementById('all-exam-timetables-modal');
+    if (existingModal) existingModal.remove();
+
+    const modalHTML = `
+        <div id="all-exam-timetables-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+            <div style="background: white; width: 90%; max-width: 900px; max-height: 90vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <div style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                    <h3 style="margin: 0; color: #1e293b; font-size: 1.25rem;"><i class="fas fa-list-alt"></i> All Existing Exam Timetables</h3>
+                    <button onclick="document.getElementById('all-exam-timetables-modal').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+                </div>
+                <div id="all-exam-timetables-content" style="padding: 20px; overflow-y: auto; flex: 1;">
+                    <div style="text-align: center; color: #64748b; padding: 40px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    loadAllExamTimetables();
+}
+
+async function loadAllExamTimetables() {
+    const container = document.getElementById('all-exam-timetables-content');
+    if (!container) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/admin/all-timetables', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 0) {
+            // Group by exam and class
+            const grouped = {};
+            result.data.forEach(entry => {
+                const examName = entry.examId ? entry.examId.name : 'Unknown Exam';
+                const key = `${examName}_Class_${entry.class}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        examName,
+                        className: entry.class,
+                        entries: []
+                    };
+                }
+                grouped[key].entries.push(entry);
+            });
+
+            let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
+            
+            for (const key in grouped) {
+                const group = grouped[key];
+                
+                // Escape properly for inline onclick
+                const escapedExamName = group.examName.replace(/'/g, "\\'");
+
+                html += `
+                    <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff;">
+                        <div style="background: #f1f5f9; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong style="color: #0f172a; font-size: 1.1rem;">${group.examName}</strong>
+                                <span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px; font-weight: 600;">Class ${group.className}</span>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="viewGroupedExamTimetable('${escapedExamName}', '${group.className}')" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; background: #0052cc; color: white; border: none; cursor: pointer;">
+                                <i class="fas fa-eye"></i> View & Edit
+                            </button>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                                <thead style="background: #f8fafc; color: #475569; text-transform: uppercase; font-size: 0.8rem;">
+                                    <tr>
+                                        <th style="padding: 10px 20px; text-align: left; border-bottom: 1px solid #e2e8f0;">Date</th>
+                                        <th style="padding: 10px 20px; text-align: left; border-bottom: 1px solid #e2e8f0;">Subject</th>
+                                        <th style="padding: 10px 20px; text-align: left; border-bottom: 1px solid #e2e8f0;">Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${group.entries.map(e => `
+                                        <tr>
+                                            <td style="padding: 10px 20px; border-bottom: 1px solid #f1f5f9;">${formatDate(e.date)}</td>
+                                            <td style="padding: 10px 20px; border-bottom: 1px solid #f1f5f9; font-weight: 500;">${e.subjectName} (${e.subjectCode})</td>
+                                            <td style="padding: 10px 20px; border-bottom: 1px solid #f1f5f9;">${e.startTime} - ${e.endTime}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px;">No exam timetables found.</div>';
+        }
+    } catch (error) {
+        console.error('Error fetching all timetables:', error);
+        container.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 40px;">Failed to load existing timetables.</div>';
+    }
+}
+
+function viewGroupedExamTimetable(examName, className) {
+    const modal = document.getElementById('all-exam-timetables-modal');
+    if (modal) modal.remove();
+
+    const titleInput = document.getElementById('exam-title-input');
+    if (titleInput) titleInput.value = examName;
+    
+    const classSelect = document.getElementById('exam-class-select');
+    if (classSelect) {
+        classSelect.value = className;
+        handleClassChange();
+    }
+}
+
+// ============================================
+// RESULT MANAGEMENT MODULE
+// ============================================
+
+function renderResultManagement() {
+    return `
+        <div class="result-mgmt-page" style="background: #f8fafc; min-height: calc(100vh - 80px); padding: 30px; font-family: 'Poppins', sans-serif;">
+            <div class="header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <h2 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin: 0;">Result Management</h2>
+                    <p style="color: #64748b; margin: 5px 0 0; font-size: 0.95rem;">Generate final student scorecards and class performance reports.</p>
+                </div>
+            </div>
+
+            <div class="filters-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px; border: 1px solid #e2e8f0;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: flex-end;">
+                    <div class="filter-item">
+                        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Select Examination</label>
+                        <select id="result-exam-select" style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; color: #1e293b; font-weight: 600; outline: none; transition: all 0.2s;">
+                            <option value="">Loading Exams...</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Select Class</label>
+                        <select id="result-class-select" style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; color: #1e293b; font-weight: 600; outline: none; transition: all 0.2s;">
+                            <option value="">Select Class</option>
+                            ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(c => `<option value="${c}">Class ${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <button onclick="fetchOverallResults()" style="width: 100%; background: #2563eb; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);">
+                            <i class="fas fa-search"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="result-status-loading" style="display: none; padding: 80px 20px; text-align: center; background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #2563eb; margin-bottom: 16px;"></i>
+                <p style="color: #64748b; font-weight: 500;">Aggregating marks and calculating percentages...</p>
+            </div>
+
+            <div id="result-mgmt-empty" style="padding: 80px 20px; text-align: center; background: white; border-radius: 16px; border: 2px dashed #e2e8f0; color: #94a3b8;">
+                <i class="fas fa-file-invoice" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+                <h3>Select Filters to Generate Report</h3>
+                <p>Choose an examination and class to view subject-wise student data.</p>
+            </div>
+
+            <div id="result-report-container" style="display: none;">
+                <!-- Results Table -->
+                <div class="table-card" style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; margin-bottom: 30px;">
+                    <div style="padding: 20px 24px; border-bottom: 1px solid #f1f5f9; background: #fff; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 700; color: #1e293b; font-size: 1rem;"><i class="fas fa-table" style="color: #2563eb; margin-right: 8px;"></i> Class Summary Report</span>
+                    </div>
+                    <div id="results-table-wrapper" style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 1000px;">
+                            <thead id="results-thead">
+                                <!-- Populated dynamically -->
+                            </thead>
+                            <tbody id="results-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function initializeResultManagement() {
+    // Load Exams for dropdown
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/exams/admin', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        const select = document.getElementById('result-exam-select');
+        if (!select) return;
+
+        if (result.success && result.data.length > 0) {
+            select.innerHTML = '<option value="">Select Examination</option>' + 
+                result.data.map(exam => `<option value="${exam._id}">${exam.name}</option>`).join('');
+        } else {
+            select.innerHTML = '<option value="">No Exams Found</option>';
+        }
+    } catch (error) {
+        console.error('Error loading exams for results:', error);
+    }
+}
+
+async function fetchOverallResults() {
+    const examId = document.getElementById('result-exam-select').value;
+    const classId = document.getElementById('result-class-select').value;
+
+    if (!examId || !classId) {
+        showToast('Please select both Examination and Class', 'warning');
+        return;
+    }
+
+    const loading = document.getElementById('result-status-loading');
+    const empty = document.getElementById('result-mgmt-empty');
+    const container = document.getElementById('result-report-container');
+    const thead = document.getElementById('results-thead');
+    const tbody = document.getElementById('results-tbody');
+
+    if (loading) loading.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    if (container) container.style.display = 'none';
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/exams/admin/overall-results/${examId}/` + classId, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (loading) loading.style.display = 'none';
+
+        if (result.success && result.data.results.length > 0) {
+            if (container) container.style.display = 'block';
+            
+            // Build dynamic headers
+            const subjects = result.data.subjects;
+            thead.innerHTML = `
+                <tr style="background: #f8fafc; border-bottom: 2px solid #f1f5f9;">
+                    <th style="text-align: left; padding: 16px 24px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Student Name</th>
+                    ${subjects.map(sub => `
+                        <th style="padding: 16px 20px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; text-align: center;">
+                            ${sub.name}<br>
+                            <span style="font-size: 0.65rem; color: #94a3b8;">Max: ${sub.maxMarks}</span>
+                        </th>
+                    `).join('')}
+                    <th style="padding: 16px 20px; font-size: 0.75rem; color: #2563eb; font-weight: 800; text-transform: uppercase; text-align: center;">Total</th>
+                    <th style="padding: 16px 20px; font-size: 0.75rem; color: #2563eb; font-weight: 800; text-transform: uppercase; text-align: center;">%</th>
+                    <th style="padding: 16px 20px; font-size: 0.75rem; color: #2563eb; font-weight: 800; text-transform: uppercase; text-align: center;">Status</th>
+                    <th style="padding: 16px 24px; font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; text-align: right;">Card</th>
+                </tr>
+            `;
+
+            // Build rows
+            tbody.innerHTML = result.data.results.map(res => {
+                const statusColor = res.status === 'Pass' ? '#10b981' : '#ef4444';
+                return `
+                    <tr style="border-bottom: 1px solid #f8fafc; transition: all 0.2s;" onmouseover="this.style.background='#fcfdfe'" onmouseout="this.style.background=''">
+                        <td style="padding: 18px 24px;">
+                            <div style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">${res.studentName}</div>
+                        </td>
+                        ${subjects.map(sub => {
+                            const score = res.results[sub.name]?.marks ?? '-';
+                            return `<td style="padding: 18px 20px; text-align: center; color: #475569; font-weight: 600;">${score}</td>`;
+                        }).join('')}
+                        <td style="padding: 18px 20px; text-align: center; font-weight: 800; color: #1e293b;">${res.totalMarksObtained}</td>
+                        <td style="padding: 18px 20px; text-align: center; font-weight: 800; color: #2563eb;">${res.percentage}%</td>
+                        <td style="padding: 18px 20px; text-align: center;">
+                            <span style="background: ${statusColor}15; color: ${statusColor}; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">${res.status}</span>
+                        </td>
+                        <td style="padding: 18px 24px; text-align: right;">
+                            <button onclick="viewReportCard('${res.studentId}')" style="background: #f1f5f9; color: #475569; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer;">
+                                <i class="fas fa-id-card"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Store for report card view
+            window.currentClassResults = result.data;
+        } else {
+            if (empty) {
+                empty.style.display = 'block';
+                empty.innerHTML = `<h3>No Results Found</h3><p>Results haven't been evaluated or sent to admin for this class.</p>`;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching results:', error);
+        if (loading) loading.style.display = 'none';
+        showToast('Error loading results', 'error');
+    }
+}
+
+function viewReportCard(studentId) {
+    const data = window.currentClassResults.results.find(r => r.studentId === studentId);
+    if (!data) return;
+
+    const examSelect = document.getElementById('result-exam-select');
+    const examName = examSelect ? examSelect.options[examSelect.selectedIndex]?.text : 'Final Examination';
+    const classId = document.getElementById('result-class-select').value;
+
+    const modalBody = `
+        <div id="report-card-print" style="width: 100%; padding: 40px; background: white; font-family: 'Poppins', sans-serif;">
+            <!-- School Header -->
+            <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px;">
+                <h1 style="margin: 0; color: #0f172a; font-size: 2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">Smart School Academy</h1>
+                <p style="margin: 5px 0; color: #64748b; font-weight: 500;">Academic Excellence & Integrity</p>
+                <div style="margin-top: 15px; font-weight: 700; color: #1e293b; background: #f1f5f9; display: inline-block; padding: 5px 15px; border-radius: 5px;">STUDENT PROGRESS REPORT</div>
+            </div>
+
+            <!-- Student Info -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div style="background: #f8fafc; padding: 15px; border-radius: 10px;">
+                    <p style="margin: 0; font-size: 0.8rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Student Name</p>
+                    <p style="margin: 2px 0 0; font-size: 1.1rem; color: #1e293b; font-weight: 700;">${data.studentName}</p>
+                </div>
+                <div style="background: #f8fafc; padding: 15px; border-radius: 10px;">
+                    <p style="margin: 0; font-size: 0.8rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Class & Exam</p>
+                    <p style="margin: 2px 0 0; font-size: 1.1rem; color: #1e293b; font-weight: 700;">Class ${classId} | ${examName}</p>
+                </div>
+            </div>
+
+            <!-- Marks Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+                <thead>
+                    <tr style="background: #0f172a; color: white;">
+                        <th style="padding: 12px 20px; text-align: left; border-radius: 5px 0 0 0;">Subject</th>
+                        <th style="padding: 12px 20px; text-align: center;">Max Marks</th>
+                        <th style="padding: 12px 20px; text-align: center; border-radius: 0 5px 0 0;">Marks Obtained</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${window.currentClassResults.subjects.map(sub => {
+                        const marks = data.results[sub.name]?.marks ?? '-';
+                        return `
+                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                <td style="padding: 12px 20px; font-weight: 700; color: #334155;">${sub.name}</td>
+                                <td style="padding: 12px 20px; text-align: center; color: #64748b;">${sub.maxMarks}</td>
+                                <td style="padding: 12px 20px; text-align: center; font-weight: 800; color: #0f172a;">${marks}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f1f5f9; font-weight: 800;">
+                        <td style="padding: 15px 20px; text-transform: uppercase; color: #0f172a;">Grand Total</td>
+                        <td style="padding: 15px 20px; text-align: center;">${data.totalMaxMarks}</td>
+                        <td style="padding: 15px 20px; text-align: center; color: #2563eb; font-size: 1.2rem;">${data.totalMarksObtained}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <!-- Summary -->
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 25px; border-radius: 12px; color: white;">
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-size: 0.75rem; opacity: 0.7; text-transform: uppercase; font-weight: 600;">Percentage Score</p>
+                    <p style="margin: 5px 0 0; font-size: 2rem; font-weight: 800;">${data.percentage}%</p>
+                </div>
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-size: 0.75rem; opacity: 0.7; text-transform: uppercase; font-weight: 600;">Final Status</p>
+                    <p style="margin: 5px 0 0; font-size: 2rem; font-weight: 800; color: ${data.status === 'Pass' ? '#4ade80' : '#f87171'};">${data.status.toUpperCase()}</p>
+                </div>
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-size: 0.75rem; opacity: 0.7; text-transform: uppercase; font-weight: 600;">Issue Date</p>
+                    <p style="margin: 5px 0 0; font-size: 1.2rem; font-weight: 800;">${new Date().toLocaleDateString()}</p>
+                </div>
+            </div>
+
+            <!-- Footer Signatures -->
+            <div style="display: flex; justify-content: space-between; margin-top: 80px;">
+                <div style="text-align: center; border-top: 1px solid #94a3b8; width: 150px; padding-top: 10px;">
+                    <p style="margin: 0; font-size: 0.8rem; font-weight: 700; color: #64748b;">Class Teacher</p>
+                </div>
+                <div style="text-align: center; border-top: 1px solid #94a3b8; width: 150px; padding-top: 10px;">
+                    <p style="margin: 0; font-size: 0.8rem; font-weight: 700; color: #64748b;">Principal</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; text-align: center; display: block;" class="no-print">
+                <button onclick="printReportCard()" style="background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 10px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-print"></i> Download / Print Report Card
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('Detailed Report Card', modalBody, 'teacher-application-modal');
+}
+
+function printReportCard() {
+    const element = document.getElementById('report-card-print');
+    const noPrint = element.querySelector('.no-print');
+    if (noPrint) noPrint.style.display = 'none';
+
+    const nameEl = element.querySelector('p[style*="font-size: 1.1rem"]');
+    const studentName = nameEl ? nameEl.textContent.trim() : 'Student';
+    
+    html2pdf().from(element).set({
+        margin: 10,
+        filename: `Report_Card_${studentName.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).save().then(() => {
+        if (noPrint) noPrint.style.display = 'block';
+    });
+}

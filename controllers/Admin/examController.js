@@ -3,6 +3,7 @@ const ExamTimetable = require("../../models/ExamTimetable");
 const ClassSubject = require("../../models/ClassSubject");
 const User = require("../../models/User");
 const PublicHoliday = require("../../models/PublicHoliday");
+const ExamEntry = require("../../models/ExamEntry");
 const moment = require("moment-timezone");
 
 // Create a new exam period
@@ -97,14 +98,14 @@ exports.addTimetableEntry = async (req, res) => {
 
     // Ignore backend date validation to support flexible scheduling
     // const examDate = moment(date);
-    if (examDate.isBefore(moment(exam.startDate)) || examDate.isAfter(moment(exam.endDate))) {
-      return res.status(400).json({
-        success: false,
-        message: `Date must be between ${moment(exam.startDate).format("YYYY-MM-DD")} and ${moment(
-          exam.endDate
-        ).format("YYYY-MM-DD")}`,
-      });
-    }
+    // if (examDate.isBefore(moment(exam.startDate)) || examDate.isAfter(moment(exam.endDate))) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `Date must be between ${moment(exam.startDate).format("YYYY-MM-DD")} and ${moment(
+    //       exam.endDate
+    //     ).format("YYYY-MM-DD")}`,
+    //   });
+    // }
 
     // 2. Validate Class Existence (Optional but good)
     const classDoc = await ClassSubject.findOne({ class: parseInt(className) });
@@ -208,6 +209,103 @@ exports.getTimetableByClass = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching timetable:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Update an existing timetable entry
+exports.updateTimetableEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      subjectName,
+      subjectCode,
+      date,
+      startTime,
+      endTime,
+      duration,
+    } = req.body;
+
+    if (!subjectName || !subjectCode || !date || !startTime || !endTime || !duration) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    const entry = await ExamTimetable.findById(id);
+    if (!entry) {
+      return res.status(404).json({ success: false, message: "Timetable entry not found" });
+    }
+
+    // 1. Check for Subject Conflict (Same subject twice in same exam for same class)
+    // Only check if subjectCode changed
+    if (subjectCode !== entry.subjectCode) {
+      const existingSubject = await ExamTimetable.findOne({
+        _id: { $ne: id },
+        examId: entry.examId,
+        class: entry.class,
+        subjectCode,
+      });
+      if (existingSubject) {
+        return res.status(400).json({
+          success: false,
+          message: `Subject ${subjectName} (${subjectCode}) is already scheduled for this exam`,
+        });
+      }
+    }
+
+    // 2. Check for Time Slot Conflict (Overlapping exams for the same class)
+    const start = moment(startTime, "HH:mm");
+    const end = moment(endTime, "HH:mm");
+
+    const overlappingExams = await ExamTimetable.find({
+      _id: { $ne: id },
+      examId: entry.examId,
+      class: entry.class,
+      date: new Date(date),
+    });
+
+    for (const otherEntry of overlappingExams) {
+      const entryStart = moment(otherEntry.startTime, "HH:mm");
+      const entryEnd = moment(otherEntry.endTime, "HH:mm");
+
+      if (
+        (start.isSameOrAfter(entryStart) && start.isBefore(entryEnd)) ||
+        (end.isAfter(entryStart) && end.isSameOrBefore(entryEnd)) ||
+        (start.isBefore(entryStart) && end.isAfter(entryEnd))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Time slot overlaps with existing exam: ${otherEntry.subjectName} (${otherEntry.startTime} - ${otherEntry.endTime})`,
+        });
+      }
+    }
+
+    // 3. Update Entry
+    entry.subjectName = subjectName;
+    entry.subjectCode = subjectCode;
+    entry.date = date;
+    entry.startTime = startTime;
+    entry.endTime = endTime;
+    entry.duration = duration;
+
+    // Optional: Re-fetch teacher if subject changed
+    if (subjectCode !== entry.subjectCode) {
+      const classDoc = await ClassSubject.findOne({ class: entry.class });
+      const subject = classDoc?.subjects.find(s => s.code === subjectCode);
+      entry.teacherId = subject?.assignedTeacher?.teacherId || null;
+    }
+
+    await entry.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Exam timetable entry updated successfully",
+      data: entry,
+    });
+  } catch (error) {
+    console.error("Error updating timetable entry:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -446,29 +544,47 @@ exports.getTeacherTimetable = async (req, res) => {
 // Get all evaluated exam submissions for admin review
 exports.getEvaluatedExams = async (req, res) => {
   try {
-    const timetables = await ExamTimetable.find({
-      'submissions.status': 'evaluated'
-    }).populate('examId', 'name');
+    // 1. Find all submissions that are submitted to admin
+    const evaluations = await ExamEntry.find({
+      type: 'SUBMISSION',
+      overallStatus: 'SUBMITTED_TO_ADMIN'
+    })
+    .populate('studentId', 'name userId')
+    .populate('timetableId');
 
-    const resultData = [];
-    timetables.forEach(timetable => {
-      const evaluatedSubmissions = timetable.submissions.filter(s => s.status === 'evaluated' || s.status === 'published');
-      if (evaluatedSubmissions.length > 0) {
-        resultData.push({
-          timetableId: timetable._id,
-          examName: timetable.examId ? timetable.examId.name : 'Unknown Exam',
-          subjectName: timetable.subjectName,
-          className: timetable.class,
-          date: timetable.date,
-          evaluatedCount: evaluatedSubmissions.length,
-          submissions: evaluatedSubmissions
-        });
+    // 2. Group by timetableId to match the current UI expectation
+    const grouped = {};
+    for (const submission of evaluations) {
+      if (!submission.timetableId) continue;
+      
+      const tId = submission.timetableId._id.toString();
+      if (!grouped[tId]) {
+        // Fetch exam info if not already there
+        const exam = await Exam.findById(submission.timetableId.examId);
+
+        grouped[tId] = {
+          timetableId: tId,
+          examName: exam ? exam.name : 'Unknown Exam',
+          subjectName: submission.timetableId.subjectName,
+          className: submission.timetableId.class,
+          date: submission.timetableId.date,
+          evaluatedCount: 0,
+          submissions: []
+        };
       }
-    });
+      
+      grouped[tId].evaluatedCount++;
+      grouped[tId].submissions.push({
+        studentId: submission.studentId._id,
+        studentName: submission.studentId.name,
+        totalMarks: submission.totalMarksObtained,
+        status: 'evaluated'
+      });
+    }
 
     res.status(200).json({
       success: true,
-      data: resultData
+      data: Object.values(grouped)
     });
   } catch (error) {
     console.error("Error fetching evaluated exams:", error);
@@ -481,28 +597,133 @@ exports.publishExamResults = async (req, res) => {
   try {
     const { timetableId } = req.params;
     
-    const timetable = await ExamTimetable.findById(timetableId);
-    if (!timetable) {
-      return res.status(404).json({ success: false, message: "Exam timetable not found" });
-    }
-
-    let updatedCount = 0;
-    timetable.submissions.forEach(sub => {
-      if (sub.status === 'evaluated') {
-        sub.status = 'published';
-        updatedCount++;
+    // Update all submissions for this timetable from SUBMITTED_TO_ADMIN to PUBLISHED
+    const result = await ExamEntry.updateMany(
+      { 
+        timetableId, 
+        type: 'SUBMISSION',
+        overallStatus: 'SUBMITTED_TO_ADMIN'
+      },
+      {
+        $set: { overallStatus: 'PUBLISHED' }
       }
-    });
-
-    await timetable.save();
+    );
 
     res.status(200).json({
       success: true,
-      message: `Successfully published results for ${updatedCount} students`,
-      data: timetable
+      message: `Successfully published results for ${result.modifiedCount} students`,
+      modifiedCount: result.modifiedCount
     });
   } catch (error) {
     console.error("Error publishing results:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get all exam timetables structure for admin dashboard View Existing Timetables
+exports.getAllExamTimetables = async (req, res) => {
+  try {
+    const timetables = await ExamTimetable.find()
+      .populate('examId', 'name academicYear')
+      .sort({ date: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: timetables
+    });
+  } catch (error) {
+    console.error("Error fetching all exam timetables:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get overall results for a specific exam and class (Admin Report)
+exports.getOverallResults = async (req, res) => {
+  try {
+    const { examId, class: className } = req.params;
+
+    // 1. Get all timetable entries for this exam and class
+    const timetables = await ExamTimetable.find({
+      examId: examId,
+      class: parseInt(className)
+    });
+
+    if (timetables.length === 0) {
+      return res.status(200).json({ success: true, data: { subjects: [], results: [] } });
+    }
+
+    const timetableIds = timetables.map(t => t._id);
+
+    // 2. Get all SUBMISSION type ExamEntry for these timetables
+    const submissions = await ExamEntry.find({
+      timetableId: { $in: timetableIds },
+      type: 'SUBMISSION'
+    }).populate('studentId', 'name userId');
+
+    // 3. Get all students in this class to handle missing subjects
+    const allStudents = await User.find({
+      role: 'student',
+      'studentData.class': parseInt(className)
+    }).select('name _id');
+
+    // 4. Map max marks for each subject (based on QUESTION entries)
+    const subjectsMaxMarks = {};
+    for (const tid of timetableIds) {
+        const questions = await ExamEntry.find({ timetableId: tid, type: 'QUESTION' });
+        subjectsMaxMarks[tid] = questions.reduce((sum, q) => sum + (q.maxMarks || 0), 0);
+    }
+
+    // 5. Aggregate by student
+    const studentResults = {};
+
+    allStudents.forEach(student => {
+        studentResults[student._id] = {
+            studentName: student.name,
+            studentId: student._id,
+            results: {}, // { subjectName: { marks, maxMarks } }
+            totalMarksObtained: 0,
+            totalMaxMarks: 0,
+            percentage: 0,
+            status: 'N/A'
+        };
+    });
+
+    submissions.forEach(sub => {
+        const studentId = sub.studentId._id.toString();
+        if (studentResults[studentId]) {
+            const timetable = timetables.find(t => t._id.toString() === sub.timetableId.toString());
+            const subjectName = timetable ? timetable.subjectName : 'Unknown';
+            const tid = sub.timetableId.toString();
+
+            studentResults[studentId].results[subjectName] = {
+                marks: sub.totalMarksObtained,
+                maxMarks: subjectsMaxMarks[tid] || 0
+            };
+            studentResults[studentId].totalMarksObtained += sub.totalMarksObtained;
+            studentResults[studentId].totalMaxMarks += subjectsMaxMarks[tid] || 0;
+        }
+    });
+
+    const finalData = Object.values(studentResults).map(sr => {
+        if (sr.totalMaxMarks > 0) {
+            sr.percentage = ((sr.totalMarksObtained / sr.totalMaxMarks) * 100).toFixed(2);
+            sr.status = sr.percentage >= 35 ? 'Pass' : 'Fail';
+        } else {
+            sr.status = 'No Exam Data';
+        }
+        return sr;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+          subjects: timetables.map(t => ({ name: t.subjectName, maxMarks: subjectsMaxMarks[t._id] || 0 })),
+          results: finalData
+      }
+    });
+
+  } catch (error) {
+    console.error("Error getting overall results:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
