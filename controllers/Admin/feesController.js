@@ -210,7 +210,6 @@ exports.createStripeSession = async (req, res) => {
     }
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'upi'],
       customer_email: req.user.email,
       line_items: [{
         price_data: {
