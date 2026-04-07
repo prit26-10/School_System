@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard - Smart School</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/common-dashboard.css">
+    <link rel="stylesheet" href="/teacher/css/teacherdashboard.css">
+    <link rel="stylesheet" href="/css/academic-calendar.css">
+    <link rel="stylesheet" href="/reset-password/reset-password.css">
+    <link rel="icon" href="data:,">
+    <style>
+        .minimal-view .sidebar, 
+        .minimal-view .top-navbar {
+            display: none !important;
+        }
+        .minimal-view .main-content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        .minimal-view .dashboard-content {
+            max-width: 100% !important;
+            padding: 0 !important;
+            background: #f8fafc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <span class="logo-text">SmartSchool</span>
+                </div>
+                <button class="sidebar-close" onclick="toggleSidebar()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <a href="#" class="nav-item active" data-page="dashboard" data-title="Dashboard">
+                        <i class="fas fa-th-large"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <!-- Timetable -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-clock"></i>
+                            <span>Timetable</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+
+                            <a href="#" class="nav-item" data-page="weekly-schedule" data-title="Weekly Schedule">
+                                <i class="fas fa-calendar-week"></i>
+                                <span>Weekly Schedule</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manage Students -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-user-graduate"></i>
+                            <span>Manage Students</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="#" class="nav-item" data-page="students-list" data-title="Students List">
+                                <i class="fas fa-users"></i>
+                                <span>View Students List</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <a href="#" class="nav-item" data-page="assigned-classes" data-title="Assigned Classes">
+                    <i class="fas fa-school"></i>
+                    <span>View Assigned Classes</span>
+                </a>
+                <!-- Academic Calendar -->
+                <div class="nav-section">
+                    <a href="#" class="nav-item" data-page="academic-calendar" data-title="Academic Calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Academic Calendar</span>
+                    </a>
+                </div>
+
+                <!-- Materials -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-book-open"></i>
+                            <span>Materials</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="#" class="nav-item" data-page="upload-pdf" data-title="Upload Material">
+                                <i class="fas fa-file-upload"></i>
+                                <span>Upload Material</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="view-materials" data-title="View Materials">
+                                <i class="fas fa-layer-group"></i>
+                                <span>Manage Materials</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assignments -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-tasks"></i>
+                            <span>Assignments</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="#" class="nav-item" data-page="manage-assignments" data-title="Manage Assignments">
+                                <i class="fas fa-clipboard-list"></i>
+                                <span>Manage Assignments</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="submissions-marks" data-title="Submissions & Marks">
+                                <i class="fas fa-check-double"></i>
+                                <span>Submissions & Marks</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manage Examinations -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-file-signature"></i>
+                            <span>Manage Examinations</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="#" class="nav-item" data-page="exam-timetable" data-title="Exam Timetable">
+                                <i class="fas fa-table"></i>
+                                <span>View Exam Timetable</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="exam-submissions-marks" data-title="Submission & Marks">
+                                <i class="fas fa-check-double"></i>
+                                <span>Submission & Marks</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendance -->
+                <div class="nav-section">
+                    <a href="#" class="nav-item" data-page="attendance" data-title="Attendance">
+                        <i class="fas fa-user-check"></i>
+                        <span>Attendance</span>
+                    </a>
+                </div>
+
+
+
+                <!-- Live Class -->
+                <div class="nav-section">
+                    <a href="#" class="nav-item" data-page="manage-live-class" data-title="Live Sessions">
+                        <i class="fas fa-video"></i>
+                        <span>Live Sessions</span>
+                    </a>
+                </div>
+
+                <!-- Announcements -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-bullhorn"></i>
+                            <span>Announcements</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="#" class="nav-item" data-page="view-announcements" data-title="View Announcements">
+                                <i class="fas fa-list-alt"></i>
+                                <span>View Announcements</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="post-announcement"
+                                data-title="Post Class Announcement">
+                                <i class="fas fa-plus-circle"></i>
+                                <span>Post Class Announcement</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Management -->
+                <div class="nav-section">
+                    <div class="nav-group">
+                        <button class="nav-group-toggle" aria-expanded="false">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Profile Management</span>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="#" class="nav-item" data-page="profile" data-title="View Profile">
+                                <i class="fas fa-user"></i>
+                                <span>View Profile</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="edit-profile" data-title="Edit Profile">
+                                <i class="fas fa-user-edit"></i>
+                                <span>Edit Profile</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logout -->
+                <div class="nav-section">
+                    <a href="#" class="nav-item logout-btn" id="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Navbar -->
+            <header class="top-navbar">
+                <div class="navbar-left">
+                    <button class="menu-toggle" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+
+                    <div class="navbar-page-title" id="navbar-page-title">
+                        Dashboard
+                    </div>
+                </div>
+
+                <div class="navbar-right">
+                    <div class="navbar-item notification-btn">
+                        <button class="icon-btn">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-badge" id="notification-badge" style="display: none;">0</span>
+                        </button>
+                    </div>
+
+                    <div class="navbar-item profile-dropdown">
+                        <button class="profile-btn">
+                            <div class="profile-avatar">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <span class="profile-name" id="top-profile-name">Teacher</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="#" data-page="profile" data-title="View Profile">
+                                <i class="fas fa-user"></i> My Profile
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" id="dropdown-logout">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <main class="dashboard-content" id="dashboard-content">
+                <!-- Content will be dynamically loaded -->
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="general-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="modal-close" onclick="closeModal('general-modal')">&times;</button>
+                <h2 class="modal-title" id="modal-title">Modal Title</h2>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Assignment Modal -->
+    <div id="assignment-modal" class="modal assignment-modal">
+        <div class="modal-content"
+            style="border-radius: 16px; overflow: hidden; padding: 0; max-width: 800px; width: 90%;">
+            <div class="modal-header"
+                style="background: #fff; color: #0f172a; padding: 22px 28px; border-bottom: 1px solid #f1f5f9;">
+                <h2 class="modal-title" id="assignment-modal-title"
+                    style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">Create Assignment</h2>
+                <button class="modal-close" onclick="closeAssignmentModal()"
+                    style="color: #94a3b8; font-size: 22px; background: transparent; border: none; cursor: pointer; transition: color 0.15s;"
+                    onmouseover="this.style.color='#475569'" onmouseout="this.style.color='#94a3b8'">&times;</button>
+            </div>
+            <div id="assignment-modal-body" class="modal-body" style="padding: 30px;">
+                <form id="assignment-form">
+                    <input type="hidden" id="assignment-id">
+
+                    <div class="form-section">
+                        <div class="form-group-modern" style="margin-bottom: 25px;">
+                            <label for="assignment-title">Title <span class="required"
+                                    style="color: #dc3545;">*</span></label>
+                            <input type="text" id="assignment-title" class="form-control-modern"
+                                placeholder="Enter assignment title" required>
+                        </div>
+
+                        <div class="form-group-modern" style="margin-bottom: 25px;">
+                            <label for="assignment-description">Description</label>
+                            <textarea id="assignment-description" class="form-control-modern" rows="3"
+                                placeholder="Enter assignment description" style="resize: vertical;"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-row three-col" style="grid-template-columns: 1fr 1fr; margin-bottom: 25px;">
+                            <div class="form-group-modern" style="margin-bottom: 0;">
+                                <label for="assignment-class">Class <span class="required"
+                                        style="color: #dc3545;">*</span></label>
+                                <select id="assignment-class" class="form-control-modern" required>
+                                    <option value="">Select Class</option>
+                                </select>
+                            </div>
+                            <div class="form-group-modern" style="margin-bottom: 0;">
+                                <label for="assignment-subject">Subject <span class="required"
+                                        style="color: #dc3545;">*</span></label>
+                                <select id="assignment-subject" class="form-control-modern" required>
+                                    <option value="">Select Subject</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row three-col" style="grid-template-columns: 1fr 1fr; margin-bottom: 25px;">
+                            <div class="form-group-modern" style="margin-bottom: 0;">
+                                <label for="assignment-deadline">Deadline <span class="required"
+                                        style="color: #dc3545;">*</span></label>
+                                <input type="datetime-local" id="assignment-deadline" class="form-control-modern"
+                                    required>
+                            </div>
+                            <div class="form-group-modern" style="margin-bottom: 0;">
+                                <label for="assignment-total-marks">Total Marks</label>
+                                <input type="number" id="assignment-total-marks" class="form-control-modern" value="100"
+                                    min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section" style="border-bottom: none; margin-bottom: 0;">
+                        <div class="form-group-modern">
+                            <label for="assignment-file">Upload File</label>
+                            <div class="upload-drag-zone" id="file-upload-zone"
+                                onclick="document.getElementById('assignment-file').click()"
+                                style="margin-bottom: 20px;">
+                                <input type="file" id="assignment-file" style="display: none;"
+                                    onchange="updateAssignmentFileName(this)">
+                                <div class="upload-icon-pulse">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <h4>Drag & drop a file here or <span>browse</span></h4>
+                                <span class="file-name" id="selected-file-name"
+                                    style="display: block; margin-top: 10px; color: #64748b; font-size: 13px;"></span>
+                            </div>
+                        </div>
+
+                        <div class="form-group-modern" style="margin-top: 20px;">
+                            <label class="custom-checkbox" style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="assignment-late-submission">
+                                <span class="checkmark" style="position: relative; margin-right: 10px;"></span>
+                                <span style="font-size: 14px; color: #475569; font-weight: 500;">Allow late
+                                    submissions</span>
+                            </label>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer"
+                style="padding: 20px 30px; background: #fff; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 12px; border-radius: 0 0 16px 16px;">
+                <button type="button" class="btn-modern btn-cancel" onclick="closeAssignmentModal()">Cancel</button>
+                <button type="button" class="btn-modern btn-primary" id="assignment-save-btn"
+                    onclick="saveAssignment()">Create Assignment</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Attendance Modal -->
+    <div id="attendance-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 520px;
+            max-width: 95vw;
+            max-height: 90vh;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+            background: #fff;
+            padding: 0;
+        ">
+            <div
+                style="background: linear-gradient(135deg, #0A66FF 0%, #0052cc 100%); padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-user-check" style="color:#fff; font-size:18px;"></i>
+                    <h2 id="attendance-modal-title" style="margin:0; font-size:17px; font-weight:600; color:#fff;">Mark
+                        Attendance</h2>
+                </div>
+                <button onclick="closeAttendanceModal()"
+                    style="background:none; border:none; color:rgba(255,255,255,0.8); font-size:22px; cursor:pointer; line-height:1; padding:0;">&times;</button>
+            </div>
+            <div id="attendance-modal-body" style="overflow-y:auto; flex:1; padding:0;">
+                <!-- Populated dynamically -->
+            </div>
+            <div
+                style="padding:16px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="closeAttendanceModal()"
+                    style="padding:9px 20px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; color:#475569; font-size:14px; font-weight:500; cursor:pointer;">Cancel</button>
+                <button id="attendance-save-btn" onclick="doSaveAttendance()"
+                    style="padding:9px 20px; border-radius:10px; border:none; background:#0A66FF; color:#fff; font-size:14px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;"><i
+                        class="fas fa-save"></i> Save Attendance</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evaluation Modal -->
+    <div id="evaluation-modal" class="modal evaluation-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Evaluate Submission</h2>
+                <button class="modal-close" onclick="closeEvaluationModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="submission-info" id="evaluation-submission-info">
+                    <!-- Populated dynamically -->
+                </div>
+                <div id="evaluation-submission-preview"
+                    style="margin-bottom: 20px; text-align: center; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; display: none;">
+                    <!-- Only show for file assignments -->
+                </div>
+                
+                <div id="evaluation-questions-container" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                    <!-- Populated dynamically with text answers -->
+                </div>
+
+                <form id="evaluation-form">
+                    <input type="hidden" id="evaluation-submission-id">
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label for="evaluation-marks">Marks <span class="required">*</span></label>
+                            <input type="number" id="evaluation-marks" class="form-input" min="0" readonly placeholder="Auto-calculated">
+                        </div>
+                        <div class="form-group">
+                            <label for="evaluation-total-marks">Total Marks</label>
+                            <input type="number" id="evaluation-total-marks" class="form-input" readonly>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="evaluation-feedback">Overall Feedback</label>
+                            <textarea id="evaluation-feedback" class="form-textarea" rows="3"
+                                placeholder="Enter general feedback for the student"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeEvaluationModal()"
+                    style="border: 1px solid #e2e8f0;">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEvaluation('save')"
+                    style="background: #0A66FF; font-weight: 600;">Save Marks</button>
+                <button type="button" class="btn btn-success" onclick="saveEvaluation('publish')"
+                    style="background: #10b981; font-weight: 600;">Publish Result</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Submission Modal -->
+    <div id="view-submission-modal" class="modal view-submission-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Submission Details</h2>
+                <button class="modal-close" onclick="closeViewSubmissionModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="view-submission-body">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeViewSubmissionModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Exam Questions Modal -->
+    <div id="manage-questions-modal" class="modal" style="display: none; z-index: 1050;">
+        <div class="modal-content" style="max-width: 800px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; border-radius: 12px; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; border-radius: 12px 12px 0 0;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Manage Exam Questions</h2>
+                <button class="modal-close" onclick="closeManageQuestionsModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #fff;">
+                <input type="hidden" id="manage-questions-timetable-id">
+                
+                <div id="questions-list-container" style="margin-bottom: 20px;">
+                    <!-- Dynamically populated questions go here -->
+                </div>
+
+                <button class="btn btn-secondary" onclick="addEmptyQuestionField()" style="width: 100%; border: 1px dashed #cbd5e1; background: #f8fafc; color: #475569; padding: 12px; border-radius: 8px; font-weight: 600;">
+                    <i class="fas fa-plus"></i> Add Question
+                </button>
+            </div>
+            
+            <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeManageQuestionsModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveExamQuestions()" style="background: #2563eb; color: white;">Save Questions</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Question Upload Modal -->
+    <div id="csv-upload-modal" class="modal" style="display: none; z-index: 1060;">
+        <div class="modal-content" style="max-width: 500px; width: 90%; border-radius: 12px; overflow: hidden; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Upload CSV Question Bank</h2>
+                <button class="modal-close" onclick="closeCSVUploadModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 24px; background: #fff;">
+                <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Upload a CSV file to create an online exam with auto-grading. <a href="#" onclick="downloadCSVTemplate()" style="color: #2563eb; font-weight: 600; text-decoration: underline;">Download Template</a></p>
+                <form id="csv-upload-form" onsubmit="handleCSVUpload(event)">
+                    <input type="hidden" id="csv-upload-timetable-id">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:600; color:#475569; font-size: 0.9rem;">Select CSV File</label>
+                        <div style="border: 2px dashed #e2e8f0; border-radius: 12px; padding: 30px; text-align: center; background: #f8fafc; cursor: pointer;" onclick="document.getElementById('csv-file').click()">
+                            <i class="fas fa-file-csv" style="font-size: 36px; color: #cbd5e1; margin-bottom: 15px; display: block;"></i>
+                            <input type="file" id="csv-file" accept=".csv" required style="display: none;" onchange="document.getElementById('csv-file-name').textContent = this.files[0].name">
+                            <span id="csv-file-name" style="font-size: 0.85rem; color: #475569; font-weight: 500;">Click to browse CSV file</span>
+                        </div>
+                    </div>
+                    <button type="submit" id="csv-upload-submit-btn" class="btn btn-primary" style="width: 100%; padding: 12px; background: #2563eb; color: white; font-weight: 700; border: none; border-radius: 8px;">
+                        Upload Questions
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Exam Submissions Modal -->
+    <div id="csv-submissions-modal" class="modal" style="display: none; z-index: 1055;">
+        <div class="modal-content" style="max-width: 900px; width: 95%; max-height: 85vh; border-radius: 12px; overflow: hidden; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Online Exam Submissions</h2>
+                <button class="modal-close" onclick="closeCSVSubmissionsModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0; overflow-y: auto; flex: 1; background: #fff;">
+                <div id="csv-submissions-list-container" style="padding: 20px;">
+                    <!-- Submissions table will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Answer Evaluation Modal (CSV System) -->
+    <div id="csv-evaluation-modal" class="modal" style="display: none; z-index: 1070;">
+        <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 90vh; border-radius: 12px; overflow: hidden; padding: 0;">
+            <div class="modal-header" style="background: #f8fafc; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Evaluate Online Submission</h2>
+                <button class="modal-close" onclick="closeCSVEvaluationModal()" style="font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1; background: #fff;">
+                <div id="student-submission-detail-container">
+                    <!-- Student answers and marks input will go here -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeCSVEvaluationModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="/reset-password/reset-password.js"></script>
+    <script src="/teacher/js/teacher-dashboard.js"></script>
+    <script src="/teacher/js/live-class.js"></script>
+</body>
+
+</html>

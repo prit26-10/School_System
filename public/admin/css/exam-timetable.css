@@ -1,0 +1,286 @@
+/* Exam Timetable - Modern & Clean Edition */
+:root {
+    --exam-primary: #0f172a;
+    --exam-secondary: #64748b;
+    --exam-accent: #3b82f6;
+    --exam-accent-hover: #2563eb;
+    --exam-accent-soft: rgba(59, 130, 246, 0.1);
+    --exam-success: #10b981;
+    --exam-danger: #ef4444;
+    --exam-warning: #f59e0b;
+    --exam-bg: #f1f5f9;
+    --exam-card-bg: #ffffff;
+    --exam-border: #e2e8f0;
+    --exam-text-main: #1e293b;
+    --exam-text-muted: #64748b;
+    --exam-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --exam-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+}
+
+.exam-timetable-container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+/* Modern Card Styling */
+.selection-card {
+    background: var(--exam-card-bg);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    border: 1px solid var(--exam-border);
+    box-shadow: var(--exam-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.selection-card:hover {
+    box-shadow: var(--exam-shadow-lg);
+    transform: translateY(-2px);
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--exam-primary);
+    margin-bottom: 24px;
+}
+
+.card-title i {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--exam-accent-soft);
+    color: var(--exam-accent);
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+}
+
+/* Form Refinement */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--exam-secondary);
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid var(--exam-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    color: var(--exam-text-main);
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.form-control:focus {
+    background: #fff;
+    border-color: var(--exam-accent);
+    box-shadow: 0 0 0 4px var(--exam-accent-soft);
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* Button Styling */
+.btn-schedule {
+    width: 100%;
+    padding: 12px;
+    background: var(--exam-accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.btn-schedule:hover {
+    background: var(--exam-accent-hover);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-schedule:active {
+    transform: scale(0.98);
+}
+
+.btn-schedule.updating {
+    background: var(--exam-warning);
+}
+
+/* Timetable Table Styling */
+.timetable-view-card {
+    background: var(--exam-card-bg);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    box-shadow: var(--exam-shadow);
+    border: 1px solid var(--exam-border);
+}
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.view-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--exam-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.exam-table-wrapper {
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--exam-border);
+}
+
+.exam-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.exam-table th {
+    background: #f8fafc;
+    text-align: left;
+    padding: 14px 20px;
+    color: var(--exam-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--exam-border);
+}
+
+.exam-table td {
+    padding: 16px 20px;
+    font-size: 0.95rem;
+    color: var(--exam-text-main);
+    border-bottom: 1px solid var(--exam-border);
+}
+
+.exam-table tr:last-child td {
+    border-bottom: none;
+}
+
+.exam-table tr:hover td {
+    background: #f1f5f9;
+}
+
+.entry-date {
+    display: flex;
+    flex-direction: column;
+}
+
+.entry-date span:first-child {
+    font-weight: 600;
+    color: var(--exam-primary);
+}
+
+.entry-date .day {
+    font-size: 0.8rem;
+    color: var(--exam-secondary);
+}
+
+.duration-badge {
+    background: #f1f5f9;
+    color: var(--exam-text-main);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid var(--exam-border);
+}
+
+/* Action Buttons in Table */
+.action-cell {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-table-action {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.btn-edit-entry {
+    background: var(--exam-accent-soft);
+    color: var(--exam-accent);
+}
+
+.btn-edit-entry:hover {
+    background: var(--exam-accent);
+    color: white;
+}
+
+.btn-delete-entry {
+    background: #fee2e2;
+    color: var(--exam-danger);
+}
+
+.btn-delete-entry:hover {
+    background: var(--exam-danger);
+    color: white;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .setup-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+}

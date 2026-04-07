@@ -1,0 +1,178 @@
+/* Proctoring Enhancements - Clean & Secure */
+:root {
+    --proctor-danger: #ef4444;
+    --proctor-warning: #f59e0b;
+    --proctor-success: #10b981;
+    --proctor-accent: #3b82f6;
+    --proctor-bg: #f8fafc;
+    --proctor-card: #ffffff;
+    --proctor-text: #1e293b;
+    --proctor-muted: #64748b;
+}
+
+/* Base Container when in exam mode */
+.exam-mode-active #sidebar, 
+.exam-mode-active .top-nav,
+.exam-mode-active #student-stats-section {
+    display: none !important;
+}
+
+.exam-window {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--proctor-bg);
+    z-index: 9999;
+    overflow-y: auto;
+    padding: 40px 20px;
+}
+
+/* Floating Timer Overlay */
+.proctor-header {
+    position: sticky;
+    top: 0;
+    z-index: 10001;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 15px 40px;
+    margin: -40px -20px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.proctor-timer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--proctor-text);
+    padding: 8px 20px;
+    background: #fff;
+    border-radius: 50px;
+    border: 2px solid #e2e8f0;
+}
+
+.proctor-timer.low-time {
+    background: #fef2f2;
+    border-color: var(--proctor-danger);
+    color: var(--proctor-danger);
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(1.05); opacity: 0.8; }
+}
+
+/* Instruction Step Card */
+.instruction-hero {
+    max-width: 800px;
+    margin: 40px auto;
+    background: var(--proctor-card);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);
+    border: 1px solid #e2e8f0;
+}
+
+.rule-list {
+    list-style: none;
+    padding: 0;
+    margin: 30px 0;
+}
+
+.rule-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 18px;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 12px;
+}
+
+.rule-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    color: var(--proctor-accent);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    flex-shrink: 0;
+}
+
+.camera-preview-zone {
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 4/3;
+    background: #000;
+    border-radius: 12px;
+    margin: 20px auto;
+    overflow: hidden;
+    position: relative;
+    border: 3px solid var(--proctor-accent);
+}
+
+.camera-preview-zone video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Proctoring Violation Overlay */
+.proctor-alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.95);
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+    padding: 40px;
+}
+
+.violation-icon {
+    font-size: 5rem;
+    color: var(--proctor-danger);
+    margin-bottom: 24px;
+}
+
+/* Questions Structure */
+.proctor-question-card {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 30px;
+    transition: all 0.3s ease;
+}
+
+.proctor-question-card:focus-within {
+    border-color: var(--proctor-accent);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.online-exam-footer {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    padding: 20px;
+    text-align: center;
+    border-top: 1px solid #e2e8f0;
+    margin: 0 -20px -40px;
+}
