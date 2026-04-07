@@ -1,29 +1,29 @@
 /* ================================================
-   SMART SCHOOL - LANDING PAGE STYLES
+   SCHOLARPATH - LANDING PAGE STYLES
    Modern Blue & White Professional Design
    ================================================ */
 
 /* CSS Variables */
 :root {
-    --primary: #0A66FF;
+    --primary: #0066FF;
     --primary-dark: #0052cc;
     --primary-light: #4d94ff;
-    --secondary: #1E88E5;
-    --accent: #00C853;
+    --secondary: #00A3FF;
+    --accent: #FFD700;
     --dark: #1a1a2e;
     --dark-light: #16213e;
     --light: #ffffff;
     --light-gray: #f8f9fa;
     --gray: #6c757d;
     --gray-light: #e9ecef;
-    --gradient: linear-gradient(135deg, #0A66FF 0%, #1E88E5 100%);
-    --gradient-secondary: linear-gradient(135deg, #1E88E5 0%, #00C853 100%);
-    --shadow: 0 10px 40px rgba(10, 102, 255, 0.15);
-    --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12);
-    --radius: 16px;
-    --radius-sm: 8px;
-    --radius-lg: 24px;
+    --gradient: linear-gradient(135deg, #0052cc 0%, #0066FF 100%);
+    --gradient-secondary: linear-gradient(135deg, #00B4D8 0%, #90E0EF 100%);
+    --shadow: 0 10px 40px rgba(0, 102, 255, 0.2);
+    --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.15);
+    --radius: 20px;
+    --radius-sm: 10px;
+    --radius-lg: 30px;
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -65,7 +65,7 @@ img {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 0 20px;
 }
@@ -79,15 +79,19 @@ img {
     left: 0;
     right: 0;
     z-index: 1000;
-    padding: 15px 0;
-    transition: var(--transition);
+    padding: 25px 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+    border-bottom: 1px solid transparent;
 }
 
 .header.header-scrolled {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(20px);
-    box-shadow: var(--shadow-sm);
-    padding: 10px 0;
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .navbar {
@@ -98,7 +102,7 @@ img {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 0 20px;
 }
@@ -173,6 +177,10 @@ img {
     gap: 15px;
 }
 
+.nav-buttons .btn {
+    min-width: 140px;
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;
@@ -209,24 +217,26 @@ img {
 .btn-primary {
     background: var(--gradient);
     color: white;
-    box-shadow: 0 4px 15px rgba(10, 102, 255, 0.3);
+    box-shadow: 0 10px 25px rgba(0, 102, 255, 0.25);
+    border: none;
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(10, 102, 255, 0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 15px 35px rgba(0, 102, 255, 0.35);
 }
 
 .btn-secondary {
-
-    color: var(--primary);
+    background: var(--primary);
+    color: white;
     border: 2px solid var(--primary);
 }
 
 .btn-secondary:hover {
-    background: var(--primary);
+    background: var(--primary-dark);
     color: white;
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0, 102, 255, 0.2);
 }
 
 .btn-outline {
@@ -415,7 +425,18 @@ img {
     align-items: center;
     padding: 120px 0 80px;
     overflow: hidden;
-    background: linear-gradient(135deg, #f8faff 0%, #e8f4ff 100%);
+    background: url('/landing/images/school-bg.png') no-repeat center center/cover;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 40%, rgba(0, 102, 255, 0.1) 100%);
+    z-index: 1;
 }
 
 .hero-background {
@@ -436,30 +457,33 @@ img {
 }
 
 .shape-1 {
-    width: 500px;
-    height: 500px;
+    width: 600px;
+    height: 600px;
     background: var(--primary);
-    top: -150px;
+    top: -200px;
     right: -100px;
+    opacity: 0.2;
     animation-delay: 0s;
 }
 
 .shape-2 {
-    width: 400px;
-    height: 400px;
+    width: 500px;
+    height: 500px;
     background: var(--secondary);
-    bottom: -100px;
+    bottom: -150px;
     left: -100px;
+    opacity: 0.15;
     animation-delay: 2s;
 }
 
 .shape-3 {
-    width: 300px;
-    height: 300px;
-    background: var(--accent);
+    width: 400px;
+    height: 400px;
+    background: #ffffff;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+    opacity: 0.1;
     animation-delay: 4s;
 }
 
@@ -493,10 +517,11 @@ img {
     grid-template-columns: 1fr 1fr;
     gap: 60px;
     align-items: center;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 0 20px;
     width: 100%;
+    z-index: 2;
 }
 
 .hero-text {
@@ -584,7 +609,7 @@ img {
 .stat-number {
     display: block;
     font-size: 32px;
-    font-weight: 700;
+    font-weight: 800;
     color: var(--primary);
 }
 

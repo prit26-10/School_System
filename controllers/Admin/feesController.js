@@ -35,7 +35,7 @@ exports.saveOrUpdateFees = async (req, res) => {
     if (!classExists) {
       return res.status(404).json({ success: false, message: "Class not found" });
     }
-    
+
     const actualClassId = classExists._id;
 
     // Upsert the fee record
@@ -101,7 +101,7 @@ exports.getAllClassFees = async (req, res) => {
     // Manual fallback: If populate didn't work (e.g., invalid ObjectId format),
     // manually fetch class data for each fee record
     const ClassSubject = require("../../models/ClassSubject");
-    
+
     fees = await Promise.all(
       fees.map(async (fee) => {
         // If classId is not populated (still an object with just the ID or string)
@@ -140,7 +140,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 exports.getPaymentSettings = async (req, res) => {
   try {
     const stripeConfigured = !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY);
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -178,10 +178,10 @@ exports.getMyFees = async (req, res) => {
     }
 
     const fees = await ClassFees.findOne({ classId: classObj._id }).populate("classId", "class");
-    
+
     // Also fetch payment status
-    const payment = await FeePayment.findOne({ 
-      studentId: req.user.id, 
+    const payment = await FeePayment.findOne({
+      studentId: req.user.id,
       classId: classObj._id,
       status: "completed"
     });
@@ -201,85 +201,85 @@ exports.getMyFees = async (req, res) => {
 // @route   POST /api/fees/stripe/session
 // @access  Student
 exports.createStripeSession = async (req, res) => {
-    try {
-        const { amount, classId } = req.body;
-        const studentId = req.user.id;
+  try {
+    const { amount, classId } = req.body;
+    const studentId = req.user.id;
 
-        if (!amount || !classId) {
-            return res.status(400).json({ success: false, message: "Amount and classId are required" });
-        }
-
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            customer_email: req.user.email,
-            line_items: [{
-                price_data: {
-                    currency: 'inr',
-                    product_data: {
-                        name: 'Academic Fees',
-                        description: `Class Fee Installment`,
-                    },
-                    unit_amount: Math.round(parseFloat(amount) * 100),
-                },
-                quantity: 1,
-            }],
-            mode: 'payment',
-            success_url: `${req.headers.origin}/student/html/studentDashboard.html?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${req.headers.origin}/student/html/studentDashboard.html?payment=cancel`,
-            metadata: {
-                studentId: studentId.toString(),
-                classId: classId.toString()
-            }
-        });
-
-        // Save pending payment record
-        await FeePayment.create({
-            studentId: studentId,
-            classId: classId,
-            amount: amount,
-            paymentId: session.id, // Store session ID
-            paymentMethod: 'stripe',
-            status: "pending"
-        });
-
-        res.status(201).json({
-            success: true,
-            url: session.url,
-            sessionId: session.id
-        });
-    } catch (err) {
-        console.error("Stripe Session Error:", err);
-        res.status(500).json({ success: false, message: err.message || "Failed to create Stripe session" });
+    if (!amount || !classId) {
+      return res.status(400).json({ success: false, message: "Amount and classId are required" });
     }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card', 'upi'],
+      customer_email: req.user.email,
+      line_items: [{
+        price_data: {
+          currency: 'inr',
+          product_data: {
+            name: 'Academic Fees',
+            description: `Class Fee Installment`,
+          },
+          unit_amount: Math.round(parseFloat(amount) * 100),
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${req.headers.origin}/student/html/studentDashboard.html?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.origin}/student/html/studentDashboard.html?payment=cancel`,
+      metadata: {
+        studentId: studentId.toString(),
+        classId: classId.toString()
+      }
+    });
+
+    // Save pending payment record
+    await FeePayment.create({
+      studentId: studentId,
+      classId: classId,
+      amount: amount,
+      paymentId: session.id, // Store session ID
+      paymentMethod: 'stripe',
+      status: "pending"
+    });
+
+    res.status(201).json({
+      success: true,
+      url: session.url,
+      sessionId: session.id
+    });
+  } catch (err) {
+    console.error("Stripe Session Error:", err);
+    res.status(500).json({ success: false, message: err.message || "Failed to create Stripe session" });
+  }
 };
 
 // @desc    Verify Stripe Payment Status
 // @route   POST /api/fees/stripe/verify
 // @access  Student
 exports.verifyStripePayment = async (req, res) => {
-    try {
-        const { sessionId } = req.body;
-        if (!sessionId) {
-            return res.status(400).json({ success: false, message: "Session ID required" });
-        }
-
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
-        if (session.payment_status === "paid") {
-            // Update payment record
-            await FeePayment.findOneAndUpdate(
-                { paymentId: sessionId },
-                { 
-                    status: "completed",
-                    payerEmail: session.customer_details?.email,
-                    payerName: session.customer_details?.name
-                }
-            );
-
-            res.status(200).json({ success: true, message: "Payment verified" });
-        } else {
-            res.status(400).json({ success: false, message: "Payment not completed" });
-        }
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, message: "Session ID required" });
     }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status === "paid") {
+      // Update payment record
+      await FeePayment.findOneAndUpdate(
+        { paymentId: sessionId },
+        {
+          status: "completed",
+          payerEmail: session.customer_details?.email,
+          payerName: session.customer_details?.name
+        }
+      );
+
+      res.status(200).json({ success: true, message: "Payment verified" });
+    } else {
+      res.status(400).json({ success: false, message: "Payment not completed" });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };

@@ -345,12 +345,12 @@ async function loadTodaySchedule() {
         // Sort chronologically (merge classes and exams)
         const combinedSchedule = [
             ...todayClasses.map(c => ({ ...c, type: 'class' })),
-            ...todayExams.map(e => ({ 
-                subjectName: e.subjectName, 
-                startTime: e.startTime, 
-                endTime: e.endTime, 
+            ...todayExams.map(e => ({
+                subjectName: e.subjectName,
+                startTime: e.startTime,
+                endTime: e.endTime,
                 type: 'exam',
-                examId: e._id 
+                examId: e._id
             }))
         ];
 
@@ -363,7 +363,7 @@ async function loadTodaySchedule() {
         const classNameDisplay = currentUser && currentUser.class ? `Class ${currentUser.class}` : 'Your Class';
 
         const numericClass = currentUser && (currentUser.class || currentUser.studentData?.class) ? (currentUser.class || currentUser.studentData?.class) : 'N/A';
- 
+
         container.innerHTML = combinedSchedule.map(item => {
             if (item.type === 'exam') {
                 return `
@@ -1191,9 +1191,9 @@ function startLiveSessionsPolling() {
             // Check if we are still on dashboard or join-session page before loading
             const dashboardActive = document.getElementById('page-dashboard')?.classList.contains('active');
             const joinActive = document.getElementById('page-join-session')?.classList.contains('active');
-            
+
             if (dashboardActive) {
-                loadTodaySchedule(); 
+                loadTodaySchedule();
             } else if (joinActive) {
                 loadLiveSessions(true);
             } else {
@@ -1947,12 +1947,12 @@ async function loadStudentExamTimetable() {
         });
 
         let html = '<div id="student-exam-pdf-content">';
-        
+
         for (const examId in grouped) {
-            const examInfo = exams.find(e => e._id === examId) || 
-                             (timetable.find(t => (t.examId?._id || t.examId) === examId)?.examId) || 
-                             { name: 'Examination' };
-            
+            const examInfo = exams.find(e => e._id === examId) ||
+                (timetable.find(t => (t.examId?._id || t.examId) === examId)?.examId) ||
+                { name: 'Examination' };
+
             const entries = grouped[examId];
 
             html += `
@@ -2101,7 +2101,7 @@ function showToast(message, type = 'info') {
 
     msgEl.textContent = message;
     toast.className = `notification-toast visible ${type}`;
-    
+
     setTimeout(() => {
         toast.className = 'notification-toast';
     }, 4000);
@@ -2156,7 +2156,7 @@ async function loadAvailableExams() {
             let btnColor = exam.isToday ? '#ef4444' : '#2563eb';
             let btnDisabled = false;
             let statusLabel = '';
-            
+
             if (exam.isSubmitted) {
                 statusLabel = `<span style="background: #ecfdf5; color: #047857; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #d1fae5;">Submitted</span>`;
                 btnText = '<i class="fas fa-check"></i> Already Submitted';
@@ -2222,7 +2222,7 @@ async function openExamFormModal(timetableId) {
     currentExamTimetableId = timetableId;
     const modal = document.getElementById('exam-form-modal');
     const container = document.getElementById('exam-questions-container');
-    
+
     if (modal) modal.style.display = 'flex';
     container.innerHTML = `<div class="loading-state" style="text-align: center; padding: 60px;">
         <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6; margin-bottom: 16px;"></i>
@@ -2238,20 +2238,20 @@ async function openExamFormModal(timetableId) {
         });
 
         const result = await response.json();
-        
+
         if (!result.success) {
             container.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 40px;">${result.message || 'Error loading questions.'}</div>`;
             return;
         }
-        
+
         document.getElementById('exam-form-subject').textContent = result.data.subjectName;
         document.getElementById('exam-form-title').textContent = result.data.examName;
 
         const questions = result.data.questions || [];
         const questionPaper = result.data.questionPaper;
-        
+
         let questionsHtml = '';
-        
+
         if (questionPaper) {
             questionsHtml += `
                 <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
@@ -2294,7 +2294,7 @@ async function openExamFormModal(timetableId) {
         }
 
         container.innerHTML = questionsHtml;
-        
+
         document.getElementById('submit-exam-btn').disabled = false;
 
     } catch (error) {
@@ -2316,7 +2316,7 @@ async function submitExamAnswers() {
 
     const answerInputs = document.querySelectorAll('.exam-answer-input');
     const answers = [];
-    
+
     // Validate that all questions have at least some text
     let allFilled = true;
     answerInputs.forEach(input => {
@@ -2345,7 +2345,7 @@ async function submitExamAnswers() {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/student/submit-exam/${currentExamTimetableId}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
@@ -2353,7 +2353,7 @@ async function submitExamAnswers() {
         });
 
         const result = await response.json();
-        
+
         if (result.success) {
             showToast("Exam submitted successfully!", "success");
             const modal = document.getElementById('exam-form-modal');
@@ -2380,7 +2380,7 @@ async function submitExamAnswers() {
 
 async function openOnlineExamZone(timetableId) {
     if (!timetableId) return;
-    
+
     // Redirect to the new dedicated exam environment
     // This ensures a clean, isolated session from the start
     window.location.href = `/exam/exam.html?id=${encodeURIComponent(timetableId)}`;
@@ -2516,16 +2516,16 @@ async function initiateExamStart() {
         // Step 2: Initialize Proctoring Observers
         document.addEventListener('fullscreenchange', handleFullscreenExitDetection);
         document.addEventListener('visibilitychange', handleVisibilityChangeDetection);
-        
+
         // Step 3: Setup UI for Exam mode
         document.body.classList.add('exam-mode-active');
         proctorState.isExamActive = true;
         proctorState.timeLeft = proctorState.duration * 60;
-        
+
         // Step 4: Render Questions & Start Timer
         startExamTimer();
         renderProctoredQuestions();
-        
+
         // Step 5: Setup Camera Monitoring
         startCameraMonitoring();
 
@@ -2679,13 +2679,13 @@ function handleVisibilityChangeDetection() {
 
 async function forceSubmitExam(reason) {
     if (!proctorState.isExamActive) return;
-    
+
     showToast(`${reason}. Submitting exam...`, "danger");
     proctorState.isExamActive = false;
-    
+
     // Stop all trackers
     cleanupProctoring();
-    
+
     // Auto-save whatever is filled
     submitProctoredExam(true, reason);
 }
@@ -2695,11 +2695,11 @@ function cleanupProctoring() {
     document.removeEventListener('fullscreenchange', handleFullscreenExitDetection);
     document.removeEventListener('visibilitychange', handleVisibilityChangeDetection);
     document.body.classList.remove('exam-mode-active');
-    
+
     if (proctorState.stream) {
         proctorState.stream.getTracks().forEach(track => track.stop());
     }
-    
+
     if (document.fullscreenElement) {
         document.exitFullscreen().catch(err => console.error(err));
     }
@@ -2724,7 +2724,7 @@ async function submitProctoredExam(isAuto = false, autoReason = "") {
     proctorState.isExamActive = false;
     const items = document.querySelectorAll('.online-question-item');
     const answers = [];
-    
+
     items.forEach(item => {
         const qId = item.dataset.id;
         const qType = item.dataset.type;
@@ -2750,11 +2750,11 @@ async function submitProctoredExam(isAuto = false, autoReason = "") {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/student/csv-submit-exam/${proctorState.timetableId}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 answers,
                 isAutoSubmission: isAuto,
                 submissionReason: autoReason || "Manual Submission"
@@ -2763,7 +2763,7 @@ async function submitProctoredExam(isAuto = false, autoReason = "") {
 
         const result = await response.json();
         cleanupProctoring();
-        
+
         if (result.success) {
             showToast(isAuto ? "Exam Auto-Submitted due to Security Policy" : "Exam successfully submitted!", isAuto ? "danger" : "success");
             const modal = document.getElementById('exam-form-modal');
@@ -2784,7 +2784,7 @@ async function submitOnlineExam(timetableId) {
 
     const items = document.querySelectorAll('.online-question-item');
     const answers = [];
-    
+
     let allAnswered = true;
     items.forEach(item => {
         const qId = item.dataset.id;
@@ -2815,7 +2815,7 @@ async function submitOnlineExam(timetableId) {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/exams/student/csv-submit-exam/${timetableId}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
@@ -2849,7 +2849,7 @@ async function loadMyResults() {
     const loading = document.getElementById('student-results-loading');
     const empty = document.getElementById('student-results-empty');
     const container = document.getElementById('student-results-container');
-    
+
     if (!container) return;
 
     if (loading) loading.style.display = 'block';
@@ -2958,11 +2958,11 @@ async function loadMyResults() {
                                     </thead>
                                     <tbody>
                                         ${data.subjects.map(s => {
-                                            const perfVal = parseFloat(s.percentage);
-                                            const grade = perfVal >= 90 ? 'A+' : perfVal >= 80 ? 'A' : perfVal >= 70 ? 'B+' : perfVal >= 60 ? 'B' : perfVal >= 50 ? 'C' : perfVal >= 35 ? 'D' : 'E';
-                                            const perfColor = perfVal >= 80 ? '#10b981' : perfVal >= 60 ? '#3b82f6' : perfVal >= 40 ? '#f59e0b' : '#ef4444';
-                                            
-                                            return `
+                        const perfVal = parseFloat(s.percentage);
+                        const grade = perfVal >= 90 ? 'A+' : perfVal >= 80 ? 'A' : perfVal >= 70 ? 'B+' : perfVal >= 60 ? 'B' : perfVal >= 50 ? 'C' : perfVal >= 35 ? 'D' : 'E';
+                        const perfColor = perfVal >= 80 ? '#10b981' : perfVal >= 60 ? '#3b82f6' : perfVal >= 40 ? '#f59e0b' : '#ef4444';
+
+                        return `
                                                 <tr style="background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                                                     <td style="padding: 18px 20px; border-radius: 12px 0 0 12px; font-weight: 700; color: #334155;">${s.subjectName}</td>
                                                     <td style="padding: 18px 20px; text-align: center; color: #94a3b8; font-weight: 600;">${s.totalMaxMarks}</td>
@@ -2973,7 +2973,7 @@ async function loadMyResults() {
                                                     </td>
                                                 </tr>
                                             `;
-                                        }).join('')}
+                    }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -3140,7 +3140,7 @@ async function initPayPalFlow(amount, classId) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const configResult = await configRes.json();
-        
+
         if (!configResult.success || !configResult.data.paypal.configured) {
             const btnContainer = document.getElementById('paypal-button-container');
             if (btnContainer) {
@@ -3154,7 +3154,7 @@ async function initPayPalFlow(amount, classId) {
         }
 
         const clientId = configResult.data.paypal.clientId;
-        
+
         if (!window.paypal) {
             const script = document.createElement('script');
             script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
@@ -3171,7 +3171,7 @@ async function initPayPalFlow(amount, classId) {
 function setupPayPalButtons(amount, classId) {
     const btnContainer = document.getElementById('paypal-button-container');
     if (!btnContainer) return;
-    
+
     btnContainer.innerHTML = '';
 
     window.paypal.Buttons({
@@ -3181,7 +3181,7 @@ function setupPayPalButtons(amount, classId) {
             shape: 'pill',
             label: 'pay'
         },
-        createOrder: async function(data, actions) {
+        createOrder: async function (data, actions) {
             try {
                 const token = localStorage.getItem('token');
                 const response = await fetch('/api/fees/paypal/order', {
@@ -3192,7 +3192,7 @@ function setupPayPalButtons(amount, classId) {
                     },
                     body: JSON.stringify({ amount, classId })
                 });
-                
+
                 const result = await response.json();
                 if (result.success) {
                     return result.orderID;
@@ -3204,7 +3204,7 @@ function setupPayPalButtons(amount, classId) {
                 alert('An error occurred while creating order.');
             }
         },
-        onApprove: async function(data, actions) {
+        onApprove: async function (data, actions) {
             try {
                 const token = localStorage.getItem('token');
                 const response = await fetch('/api/fees/paypal/capture', {
@@ -3279,7 +3279,7 @@ function showLockoutModal(feeData) {
 
     if (overlay) overlay.style.display = 'block';
     if (modal) modal.style.display = 'block';
-    
+
     if (feeData.unauthorized) {
         if (amountSpan) amountSpan.textContent = 'Account Verification';
         if (description) description.textContent = feeData.message || 'We could not verify your current fee status. Please pay any pending fees or contact school administration to restore access.';
@@ -3304,7 +3304,7 @@ async function initStripeLocked(amount, classId) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const configResult = await configRes.json();
-        
+
         const btnContainer = document.getElementById('paypal-button-container-locked'); // Reusing container ID
         if (!btnContainer) return;
 
@@ -3319,7 +3319,7 @@ async function initStripeLocked(amount, classId) {
 
         btnContainer.innerHTML = `
             <button id="stripe-checkout-button" style="width:100%; padding: 14px; font-weight: 700; border-radius: 12px; background: #6366f1; border: none; font-size: 1rem; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4);">
-                <i class="fas fa-credit-card"></i> Pay Fees with Card
+                <i class="fas fa-credit-card"></i> Pay Now
             </button>
             <div style="margin-top: 12px; text-align: center; font-size: 12px; color: #64748b;">
                 <i class="fas fa-lock"></i> Secured by Stripe
